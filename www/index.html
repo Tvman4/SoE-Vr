@@ -1,0 +1,2317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shadows of Eldoria — 3D RPG</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e0d0; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #ui { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+
+  #topbar {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 10px 12px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+    gap: 8px; flex-wrap: wrap;
+  }
+  .stat-box {
+    background: rgba(20,15,10,0.9); border: 1px solid #8b7355;
+    border-radius: 8px; padding: 6px 12px; min-width: 105px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+  .stat-label { font-size: 10px; color: #a09070; letter-spacing: 1px; text-transform: uppercase; }
+  .stat-value { font-size: 16px; font-weight: 700; color: #f0e6d0; }
+  .hp-bar-bg { height: 7px; background: #2a1f15; border-radius: 4px; margin-top: 3px; overflow: hidden; }
+  .hp-bar-fill { height: 100%; background: linear-gradient(90deg, #8b1a1a, #c43c3c); border-radius: 4px; transition: width 0.25s; }
+  .xp-bar-fill { height: 100%; background: linear-gradient(90deg, #2a5a2a, #4caf50); border-radius: 4px; transition: width 0.25s; }
+  .stamina-bar-fill { height: 100%; background: linear-gradient(90deg, #1a5a8b, #3c9ac4); border-radius: 4px; transition: width 0.15s; }
+
+  #quest-box {
+    background: rgba(20,15,10,0.92); border: 1px solid #8b7355;
+    border-radius: 8px; padding: 8px 12px; max-width: 290px; flex: 1;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+  #quest-box h3 { font-size: 11px; color: #d4a84b; margin-bottom: 4px; letter-spacing: 0.5px; }
+  #quest-title { font-size: 13px; font-weight: 700; color: #f0e0c0; margin-bottom: 3px; }
+  #quest-text { font-size: 12px; line-height: 1.35; color: #c8bba0; }
+  #quest-steps { margin-top: 6px; font-size: 11px; color: #a09070; }
+  #quest-steps .done { color: #6a9a5a; text-decoration: line-through; }
+  #quest-steps .current { color: #d4a84b; font-weight: 600; }
+
+  #weapon-hud {
+    position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,15,10,0.85); border: 1px solid #8b7355;
+    border-radius: 8px; padding: 6px 16px; font-size: 13px; color: #d4a84b;
+    pointer-events: none; display: none;
+  }
+  #weapon-hud.show { display: block; }
+
+  #controls-hint {
+    padding: 8px 14px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    font-size: 11px; color: #a09070; text-align: center;
+  }
+
+  #dialogue {
+    display: none; position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    width: min(580px, 92vw); background: rgba(18,12,8,0.96);
+    border: 2px solid #8b7355; border-radius: 12px; padding: 16px 18px;
+    pointer-events: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); z-index: 50;
+  }
+  #dialogue.visible { display: block; animation: fadeIn 0.22s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  #dialogue-name { font-size: 15px; font-weight: 700; color: #d4a84b; margin-bottom: 6px; }
+  #dialogue-text { font-size: 14px; line-height: 1.5; color: #e8e0d0; margin-bottom: 12px; min-height: 40px; }
+  #dialogue-choices { display: flex; flex-direction: column; gap: 7px; }
+  .choice-btn {
+    background: rgba(60,45,30,0.85); border: 1px solid #6b5a40; color: #e0d5c0;
+    padding: 11px 14px; border-radius: 6px; cursor: pointer; text-align: left;
+    font-size: 14px; transition: all 0.15s; pointer-events: auto;
+  }
+  .choice-btn:hover, .choice-btn:active { background: rgba(90,70,40,0.95); border-color: #d4a84b; color: #fff; }
+
+  #inventory {
+    display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(400px, 90vw); background: rgba(18,12,8,0.97);
+    border: 2px solid #8b7355; border-radius: 12px; padding: 16px;
+    pointer-events: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.7); z-index: 50;
+  }
+  #inventory.visible { display: block; }
+  #inventory h2 { color: #d4a84b; margin-bottom: 12px; font-size: 17px; }
+  .inv-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 10px; background: rgba(40,30,20,0.65); border-radius: 6px; margin-bottom: 5px;
+    border: 1px solid #4a3a28;
+  }
+  .inv-item span { color: #c8bba0; font-size: 14px; }
+  .inv-item .qty { color: #d4a84b; font-weight: 600; }
+  .inv-item.equipped { border-color: #d4a84b; background: rgba(60,45,25,0.8); }
+
+  #crosshair {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 4px; height: 4px; background: rgba(255,255,255,0.75);
+    border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.4);
+  }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.55); }
+  #crosshair::before { width: 14px; height: 1.5px; top: 1.25px; left: -5px; }
+  #crosshair::after { width: 1.5px; height: 14px; left: 1.25px; top: -5px; }
+
+  #title-screen {
+    position: absolute; inset: 0; background: radial-gradient(ellipse at center, #2a2015 0%, #0a0805 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; pointer-events: none; padding: 20px; transition: opacity 0.6s;
+  }
+  #title-screen h1 {
+    font-size: clamp(28px, 7vw, 54px); color: #d4a84b; text-shadow: 0 0 30px rgba(212,168,75,0.4);
+    letter-spacing: 3px; margin-bottom: 6px; font-weight: 300; text-align: center;
+  }
+  #title-screen .subtitle { font-size: 13px; color: #8b7355; margin-bottom: 24px; letter-spacing: 2px; }
+  #title-story { max-width: 480px; text-align: center; margin-top: 18px; font-size: 13px; line-height: 1.55; color: #a09070; }
+  #vr-status { font-size: 14px; color: #d4a84b; margin-top: 20px; letter-spacing: 1px; }
+
+  #damage-flash { position: absolute; inset: 0; background: rgba(180,20,20,0.32); opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+  #levelup {
+    position: absolute; top: 26%; left: 50%; transform: translateX(-50%);
+    font-size: 24px; color: #4caf50; text-shadow: 0 0 18px rgba(76,175,80,0.6);
+    opacity: 0; pointer-events: none; transition: opacity 0.5s; font-weight: 700;
+  }
+  #time-display {
+    position: absolute; top: 70px; right: 12px;
+    background: rgba(20,15,10,0.8); border: 1px solid #6b5a40;
+    border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #c0b090;
+  }
+
+  /* VR-only build for Quest / App Lab */
+</style>
+</head>
+<body>
+<div id="title-screen">
+  <h1>SHADOWS OF ELDORIA</h1>
+  <div class="subtitle">VR FIRST-PERSON RPG · META QUEST</div>
+  <div id="title-story">
+    The Crystal of Light has been stolen. Shadows creep across Eldoria.<br>
+    You are <strong>Kael</strong> of Brightwood. Enter the Elder's house,<br>
+    accept the quest, and restore the dawn.
+  </div>
+  <div id="vr-status">Entering VR…</div>
+</div>
+
+<div id="ui" style="display:none;">
+  <div id="topbar">
+    <div class="stat-box">
+      <div class="stat-label">Health</div>
+      <div class="stat-value"><span id="hp-text">100</span>/<span id="hp-max">100</span></div>
+      <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-bar" style="width:100%"></div></div>
+      <div class="stat-label" style="margin-top:5px;">Stamina</div>
+      <div class="hp-bar-bg"><div class="stamina-bar-fill" id="stamina-bar" style="width:100%"></div></div>
+    </div>
+    <div id="quest-box">
+      <h3>QUEST LOG</h3>
+      <div id="quest-title">A Call to Arms</div>
+      <p id="quest-text">Enter Elder Mira's house and speak with her.</p>
+      <div id="quest-steps"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Lvl <span id="level-text">1</span></div>
+      <div class="stat-value"><span id="xp-text">0</span> XP</div>
+      <div class="hp-bar-bg"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div id="time-display">Day · Morning</div>
+  <div id="crosshair"></div>
+  <div id="damage-flash"></div>
+  <div id="levelup">LEVEL UP!</div>
+  <div id="weapon-hud"><span id="weapon-name">Iron Sword</span></div>
+  <div id="controls-hint">Left Stick Move · Right Stick Turn · Trigger Attack · A / Squeeze Interact · Y Inventory · Grip Sprint</div>
+</div>
+
+<div id="dialogue">
+  <div id="dialogue-name"></div>
+  <div id="dialogue-text"></div>
+  <div id="dialogue-choices"></div>
+</div>
+
+<div id="inventory">
+  <h2>Inventory & Weapons</h2>
+  <div id="inv-list"></div>
+  <p style="margin-top:12px;font-size:12px;color:#8b7355;text-align:center">Click item to equip/use · I to close</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// SHADOWS OF ELDORIA — First-Person RPG
+// ============================================================
+
+const clock = new THREE.Clock();
+let scene, camera, renderer, player, dolly;
+let yaw = 0;
+let gameStarted = false;
+let inDialogue = false;
+let inventoryOpen = false;
+let vrSessionActive = false;
+
+// VR controllers
+let controller0, controller1;
+let controllerGrip0, controllerGrip1;
+let moveAxes = { x: 0, y: 0 };
+let turnAxes = { x: 0, y: 0 };
+let vrSprint = false;
+let lastTurnTime = 0;
+const TURN_SNAP = 0.6; // radians (~34 deg)
+const TURN_COOLDOWN = 0.35;
+
+// Day/Night — start at morning
+let dayTime = 0.32;
+const DAY_SPEED = 0.007;
+
+const playerStats = {
+  hp: 100, maxHp: 100, level: 1, xp: 0, xpToNext: 50,
+  attack: 12, defense: 4, gold: 15,
+  stamina: 100, maxStamina: 100
+};
+let isSprinting = false;
+
+const weapons = [
+  { id: 'fists', name: 'Fists', dmg: 6, range: 1.8, cooldown: 0.5 },
+  { id: 'sword', name: 'Iron Sword', dmg: 16, range: 2.8, cooldown: 0.55 },
+  { id: 'axe', name: 'Battle Axe', dmg: 24, range: 2.4, cooldown: 0.85 },
+  { id: 'staff', name: 'Arcane Staff', dmg: 14, range: 4.5, cooldown: 0.7, magic: true }
+];
+let currentWeapon = 1;
+let attackCooldown = 0;
+let weaponMeshes = {};
+
+const inventory = [
+  { id: 'sword', name: 'Iron Sword', qty: 1, type: 'weapon', weaponId: 'sword' },
+  { id: 'potion', name: 'Health Potion', qty: 3, type: 'consumable' },
+  { id: 'map', name: 'Village Map', qty: 1, type: 'quest' }
+];
+
+const QUEST = [
+  {
+    id: 0, title: 'A Call to Arms',
+    text: 'Enter Elder Mira\'s house (wooden building west of the square, lantern by the door) and speak with her.',
+    steps: ['Enter Elder Mira\'s house', 'Speak with Elder Mira', 'Accept the quest']
+  },
+  {
+    id: 1, title: 'Find the Mage',
+    text: 'Leave the house and follow the dirt path east. Find Lira the Mage near the wooden bridge.',
+    steps: ['✓ Spoke with Elder Mira', 'Find Lira near the eastern bridge', 'Speak with Lira']
+  },
+  {
+    id: 2, title: 'Clear the Road',
+    text: 'Goblin scouts block the path past the bridge. Defeat ALL of them, then return to Lira.',
+    steps: ['✓ Found Lira', 'Defeat all goblin scouts', 'Return to Lira']
+  },
+  {
+    id: 3, title: 'The Forbidden Tower',
+    text: 'The road is clear. Follow the path north to the Forbidden Tower and claim the Crystal of Light.',
+    steps: ['✓ Road cleared', 'Reach the Forbidden Tower', 'Claim the Crystal']
+  },
+  {
+    id: 4, title: 'Dawn Restored',
+    text: 'You reclaimed the Crystal of Light! Day and night return to Eldoria. You are a true champion.',
+    steps: ['✓ Crystal reclaimed', 'Victory!']
+  }
+];
+let questStage = 0;
+
+const npcs = [];
+const enemies = [];
+const interactables = [];
+const collectibles = [];
+const rooms = [];
+const colliders = []; // {minX, maxX, minZ, maxZ}
+const particles = [];
+let inTower = false;
+let boss = null;
+let cutsceneActive = false;
+
+let sunLight, ambientLight, skyMesh, sunMesh, moonMesh;
+
+// ============================================================
+// AUDIO — procedural SFX + browser TTS voice lines
+// ============================================================
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playSFX(type) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  if (type === 'hit') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.start(now); osc.stop(now + 0.13);
+  } else if (type === 'swing') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+    gain.gain.setValueAtTime(0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.start(now); osc.stop(now + 0.09);
+  } else if (type === 'pickup') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.setValueAtTime(780, now + 0.08);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    osc.start(now); osc.stop(now + 0.22);
+  } else if (type === 'talk') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.setValueAtTime(260, now + 0.05);
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc.start(now); osc.stop(now + 0.16);
+  } else if (type === 'hurt') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    osc.start(now); osc.stop(now + 0.22);
+  } else if (type === 'victory') {
+    const notes = [523, 659, 784, 1046];
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.1, now + i * 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+      o.start(now + i * 0.12); o.stop(now + i * 0.12 + 0.32);
+    });
+  } else if (type === 'puzzle') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.setValueAtTime(660, now + 0.1);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.start(now); osc.stop(now + 0.26);
+  } else if (type === 'door') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc.start(now); osc.stop(now + 0.36);
+  }
+}
+
+function speak(name, text) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.95;
+    u.pitch = name === 'Malakar' ? 0.55 : name === 'Elder Mira' ? 1.15 : name === 'Lira the Mage' ? 1.25 : 1.0;
+    u.volume = 0.9;
+    // Prefer a matching voice if available
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length) {
+      const pref = name === 'Malakar'
+        ? voices.find(v => /male|daniel|alex|david/i.test(v.name))
+        : voices.find(v => /female|samantha|victoria|karen|zira/i.test(v.name));
+      if (pref) u.voice = pref;
+    }
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function detectMobile() {
+  // VR-only build — no mobile/desktop hybrid
+}
+
+function createHuman(skin = 0xc4a88a, cloth = 0x3a5a7a, hair = 0x2a1a0a, scale = 1) {
+  const g = new THREE.Group();
+  const s = scale;
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.65, metalness: 0.05 });
+  const clothMat = new THREE.MeshStandardMaterial({ color: cloth, roughness: 0.75 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: hair, roughness: 0.9 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2a2a38, roughness: 0.85 });
+  const bootMat = new THREE.MeshStandardMaterial({ color: 0x1a1510, roughness: 0.9 });
+
+  // --- Head (slightly oval) ---
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.20 * s, 14, 12), skinMat);
+  head.scale.set(0.95, 1.08, 0.9);
+  head.position.y = 1.58 * s;
+  head.castShadow = true;
+  g.add(head);
+
+  // Neck
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.09 * s, 0.12 * s, 8), skinMat);
+  neck.position.y = 1.40 * s;
+  g.add(neck);
+
+  // Hair cap
+  const hairCap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22 * s, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    hairMat
+  );
+  hairCap.position.y = 1.64 * s;
+  hairCap.scale.set(1.02, 1.0, 1.0);
+  g.add(hairCap);
+
+  // Side hair
+  const sideL = new THREE.Mesh(new THREE.SphereGeometry(0.08 * s, 8, 6), hairMat);
+  sideL.position.set(-0.16 * s, 1.52 * s, 0.02 * s);
+  sideL.scale.set(0.7, 1.2, 0.8);
+  g.add(sideL);
+  const sideR = sideL.clone();
+  sideR.position.x = 0.16 * s;
+  g.add(sideR);
+
+  // Eyes (whites + pupils)
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.4 });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1a1520, roughness: 0.3 });
+  for (const sx of [-1, 1]) {
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.038 * s, 8, 6), whiteMat);
+    white.position.set(sx * 0.07 * s, 1.59 * s, 0.16 * s);
+    white.scale.set(1, 0.85, 0.7);
+    g.add(white);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.018 * s, 6, 6), pupilMat);
+    pupil.position.set(sx * 0.07 * s, 1.59 * s, 0.19 * s);
+    g.add(pupil);
+  }
+
+  // Nose
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.025 * s, 6, 5), skinMat);
+  nose.position.set(0, 1.54 * s, 0.18 * s);
+  nose.scale.set(0.7, 1.0, 1.1);
+  g.add(nose);
+
+  // --- Torso (tapered) ---
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42 * s, 0.52 * s, 0.26 * s), clothMat);
+  torso.position.y = 1.12 * s;
+  torso.castShadow = true;
+  g.add(torso);
+
+  // Shoulders
+  const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.1 * s, 8, 6), clothMat);
+  shoulderL.position.set(-0.22 * s, 1.32 * s, 0);
+  g.add(shoulderL);
+  const shoulderR = shoulderL.clone();
+  shoulderR.position.x = 0.22 * s;
+  g.add(shoulderR);
+
+  // Belt
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.44 * s, 0.07 * s, 0.28 * s), new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.8 }));
+  belt.position.y = 0.86 * s;
+  g.add(belt);
+
+  // --- Legs (upper + lower for better look) ---
+  const thighGeo = new THREE.CylinderGeometry(0.09 * s, 0.08 * s, 0.38 * s, 8);
+  const calfGeo = new THREE.CylinderGeometry(0.075 * s, 0.065 * s, 0.36 * s, 8);
+  const ll = new THREE.Group();
+  const thighL = new THREE.Mesh(thighGeo, pantsMat);
+  thighL.position.y = 0.19 * s;
+  thighL.castShadow = true;
+  ll.add(thighL);
+  const calfL = new THREE.Mesh(calfGeo, pantsMat);
+  calfL.position.y = -0.16 * s;
+  calfL.castShadow = true;
+  ll.add(calfL);
+  const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.11 * s, 0.1 * s, 0.16 * s), bootMat);
+  bootL.position.set(0, -0.38 * s, 0.02 * s);
+  ll.add(bootL);
+  ll.position.set(-0.11 * s, 0.48 * s, 0);
+  g.add(ll);
+
+  const rl = new THREE.Group();
+  const thighR = new THREE.Mesh(thighGeo, pantsMat);
+  thighR.position.y = 0.19 * s;
+  thighR.castShadow = true;
+  rl.add(thighR);
+  const calfR = new THREE.Mesh(calfGeo, pantsMat);
+  calfR.position.y = -0.16 * s;
+  calfR.castShadow = true;
+  rl.add(calfR);
+  const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.11 * s, 0.1 * s, 0.16 * s), bootMat);
+  bootR.position.set(0, -0.38 * s, 0.02 * s);
+  rl.add(bootR);
+  rl.position.set(0.11 * s, 0.48 * s, 0);
+  g.add(rl);
+
+  // --- Arms ---
+  const upperArmGeo = new THREE.CylinderGeometry(0.065 * s, 0.06 * s, 0.32 * s, 8);
+  const forearmGeo = new THREE.CylinderGeometry(0.055 * s, 0.05 * s, 0.28 * s, 8);
+  const handGeo = new THREE.SphereGeometry(0.055 * s, 8, 6);
+
+  const la = new THREE.Group();
+  const uaL = new THREE.Mesh(upperArmGeo, clothMat);
+  uaL.position.y = -0.12 * s;
+  uaL.castShadow = true;
+  la.add(uaL);
+  const faL = new THREE.Mesh(forearmGeo, skinMat);
+  faL.position.y = -0.40 * s;
+  faL.castShadow = true;
+  la.add(faL);
+  const handL = new THREE.Mesh(handGeo, skinMat);
+  handL.position.y = -0.56 * s;
+  la.add(handL);
+  la.position.set(-0.28 * s, 1.30 * s, 0);
+  la.rotation.z = 0.12;
+  g.add(la);
+
+  const ra = new THREE.Group();
+  const uaR = new THREE.Mesh(upperArmGeo, clothMat);
+  uaR.position.y = -0.12 * s;
+  uaR.castShadow = true;
+  ra.add(uaR);
+  const faR = new THREE.Mesh(forearmGeo, skinMat);
+  faR.position.y = -0.40 * s;
+  faR.castShadow = true;
+  ra.add(faR);
+  const handR = new THREE.Mesh(handGeo, skinMat);
+  handR.position.y = -0.56 * s;
+  ra.add(handR);
+  ra.position.set(0.28 * s, 1.30 * s, 0);
+  ra.rotation.z = -0.12;
+  g.add(ra);
+
+  g.userData = { leftLeg: ll, rightLeg: rl, leftArm: la, rightArm: ra, walkPhase: Math.random() * 10 };
+  return g;
+}
+
+function createSky() {
+  const skyGeo = new THREE.SphereGeometry(200, 32, 24);
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {
+      topColor: { value: new THREE.Color(0x4a90d0) },
+      midColor: { value: new THREE.Color(0x87b8e8) },
+      bottomColor: { value: new THREE.Color(0xc8dcf0) },
+      sunDir: { value: new THREE.Vector3(0.3, 0.8, 0.2) }
+    },
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = wp.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor, midColor, bottomColor, sunDir;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition).y;
+        vec3 col;
+        if (h > 0.0) col = mix(midColor, topColor, pow(h, 0.55));
+        else col = mix(midColor, bottomColor, pow(-h, 0.35));
+        float sun = max(0.0, dot(normalize(vWorldPosition), sunDir));
+        col += vec3(1.0, 0.9, 0.6) * pow(sun, 48.0) * 0.55;
+        col += vec3(1.0, 0.7, 0.3) * pow(sun, 8.0) * 0.22;
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `
+  });
+  skyMesh = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(skyMesh);
+
+  sunMesh = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 16), new THREE.MeshBasicMaterial({ color: 0xfff0c0 }));
+  scene.add(sunMesh);
+  moonMesh = new THREE.Mesh(new THREE.SphereGeometry(3.5, 12, 12), new THREE.MeshBasicMaterial({ color: 0xddeeff }));
+  scene.add(moonMesh);
+
+  const starGeo = new THREE.BufferGeometry();
+  const sc = 500;
+  const pos = new Float32Array(sc * 3);
+  for (let i = 0; i < sc; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 170;
+    pos[i*3] = Math.sin(phi)*Math.cos(theta)*r;
+    pos[i*3+1] = Math.abs(Math.cos(phi))*r*0.95 + 15;
+    pos[i*3+2] = Math.sin(phi)*Math.sin(theta)*r;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.55, transparent: true, opacity: 0 }));
+  scene.add(stars);
+  scene.userData.stars = stars;
+}
+
+function updateDayNight(dt) {
+  dayTime = (dayTime + DAY_SPEED * dt) % 1;
+  const angle = (dayTime - 0.25) * Math.PI * 2;
+  const sunY = Math.sin(angle);
+  const sunX = Math.cos(angle) * 0.7;
+  const sunZ = Math.sin(angle * 0.3) * 0.3;
+  const sunDir = new THREE.Vector3(sunX, Math.max(sunY, -0.15), sunZ).normalize();
+  sunLight.position.copy(sunDir.clone().multiplyScalar(80));
+  sunMesh.position.copy(sunDir.clone().multiplyScalar(160));
+  moonMesh.position.copy(sunDir.clone().multiplyScalar(-140));
+
+  const isDay = sunY > 0.05;
+  const isDawn = sunY > -0.1 && sunY < 0.35 && dayTime < 0.4;
+  const isDusk = sunY > -0.1 && sunY < 0.35 && dayTime > 0.6;
+
+  let top, mid, bot, ambInt, sunInt, fogCol;
+  if (isDay && !isDawn && !isDusk) {
+    top = new THREE.Color(0x4a90d0); mid = new THREE.Color(0x87b8e8); bot = new THREE.Color(0xc8dcf0);
+    ambInt = 0.55; sunInt = 1.05; fogCol = 0xb0c8e0;
+    scene.userData.stars.material.opacity = 0;
+  } else if (isDawn) {
+    top = new THREE.Color(0x3a5080); mid = new THREE.Color(0xe08050); bot = new THREE.Color(0xf0b070);
+    ambInt = 0.35; sunInt = 0.7; fogCol = 0xd0a080;
+    scene.userData.stars.material.opacity = 0.15;
+  } else if (isDusk) {
+    top = new THREE.Color(0x2a3060); mid = new THREE.Color(0xc06040); bot = new THREE.Color(0xe09050);
+    ambInt = 0.3; sunInt = 0.6; fogCol = 0xc08060;
+    scene.userData.stars.material.opacity = 0.25;
+  } else {
+    top = new THREE.Color(0x060618); mid = new THREE.Color(0x101028); bot = new THREE.Color(0x1a1530);
+    ambInt = 0.18; sunInt = 0.08; fogCol = 0x12101a;
+    scene.userData.stars.material.opacity = 0.9;
+  }
+
+  skyMesh.material.uniforms.topColor.value.copy(top);
+  skyMesh.material.uniforms.midColor.value.copy(mid);
+  skyMesh.material.uniforms.bottomColor.value.copy(bot);
+  skyMesh.material.uniforms.sunDir.value.copy(sunDir);
+  ambientLight.intensity = ambInt;
+  sunLight.intensity = Math.max(sunInt, 0.05);
+  sunLight.color.set(isDay ? 0xfff5e0 : 0xa0b0ff);
+  scene.fog.color.set(fogCol);
+  scene.fog.density = isDay ? 0.007 : 0.011;
+
+  let label;
+  if (dayTime < 0.2) label = 'Night';
+  else if (dayTime < 0.3) label = 'Dawn';
+  else if (dayTime < 0.45) label = 'Morning';
+  else if (dayTime < 0.55) label = 'Noon';
+  else if (dayTime < 0.7) label = 'Afternoon';
+  else if (dayTime < 0.8) label = 'Dusk';
+  else label = 'Night';
+  document.getElementById('time-display').textContent = (isDay ? 'Day' : 'Night') + ' · ' + label;
+}
+
+function createGround() {
+  // Solid base so ground is always visible (never see through to sky)
+  const base = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshStandardMaterial({ color: 0x2d5a28, roughness: 1.0 })
+  );
+  base.rotation.x = -Math.PI / 2;
+  base.position.y = -0.05;
+  base.receiveShadow = true;
+  scene.add(base);
+
+  // Detailed grass layer on top
+  const grassGeo = new THREE.PlaneGeometry(220, 220, 40, 40);
+  const pos = grassGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    // Keep displacement small so ground stays near camera eye level
+    pos.setY(i, Math.sin(x * 0.08) * 0.12 + Math.cos(z * 0.07) * 0.1);
+  }
+  grassGeo.computeVertexNormals();
+  const colors = [];
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    // Strong green so it doesn't wash out into sky fog
+    c.setHSL(0.30 + Math.random() * 0.04, 0.55 + Math.random() * 0.15, 0.22 + Math.random() * 0.08);
+    colors.push(c.r, c.g, c.b);
+  }
+  grassGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const grass = new THREE.Mesh(grassGeo, new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.95,
+    metalness: 0.0
+  }));
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.y = 0.02;
+  grass.receiveShadow = true;
+  scene.add(grass);
+
+  // Dirt path
+  const path = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.5, 100),
+    new THREE.MeshStandardMaterial({ color: 0x7a5a35, roughness: 0.95 })
+  );
+  path.rotation.x = -Math.PI / 2;
+  path.position.set(0, 0.08, 28);
+  path.receiveShadow = true;
+  scene.add(path);
+
+  // Village square
+  const square = new THREE.Mesh(
+    new THREE.CircleGeometry(8, 24),
+    new THREE.MeshStandardMaterial({ color: 0x5a5045, roughness: 0.9 })
+  );
+  square.rotation.x = -Math.PI / 2;
+  square.position.set(0, 0.07, -3);
+  square.receiveShadow = true;
+  scene.add(square);
+}
+
+function createRoom(cx, cz, w, d, h, floorColor, wallColor, name) {
+  const group = new THREE.Group();
+  const halfW = w/2, halfD = d/2;
+
+  // Wooden / stone floor (different from grass)
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.85 }));
+  floor.rotation.x = -Math.PI/2; floor.position.y = 0.09; floor.receiveShadow = true; group.add(floor);
+
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.9 }));
+  ceil.rotation.x = Math.PI/2; ceil.position.y = h; group.add(ceil);
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.88 });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.25), wallMat);
+  back.position.set(0, h/2, -halfD); back.castShadow = true; back.receiveShadow = true; group.add(back);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(0.25, h, d), wallMat);
+  left.position.set(-halfW, h/2, 0); left.castShadow = true; left.receiveShadow = true; group.add(left);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(0.25, h, d), wallMat);
+  right.position.set(halfW, h/2, 0); right.castShadow = true; right.receiveShadow = true; group.add(right);
+
+  const doorW = 1.4;
+  const sideW = (w - doorW) / 2;
+  if (sideW > 0.1) {
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(sideW, h, 0.25), wallMat);
+    fl.position.set(-halfW + sideW/2, h/2, halfD); group.add(fl);
+    const fr = new THREE.Mesh(new THREE.BoxGeometry(sideW, h, 0.25), wallMat);
+    fr.position.set(halfW - sideW/2, h/2, halfD); group.add(fr);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorW, h - 2.2, 0.25), wallMat);
+    lintel.position.set(0, 2.2 + (h-2.2)/2, halfD); group.add(lintel);
+  }
+
+  const lamp = new THREE.PointLight(0xffaa66, 0.95, 12);
+  lamp.position.set(0, h - 0.4, 0); group.add(lamp);
+
+  // Table
+  const table = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 0.9), new THREE.MeshStandardMaterial({ color: 0x5a3a20 }));
+  table.position.set(0, 0.75, -0.5); table.castShadow = true; group.add(table);
+  for (const [lx, lz] of [[-0.55,-0.3],[0.55,-0.3],[-0.55,0.3],[0.55,0.3]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.7, 0.08), new THREE.MeshStandardMaterial({ color: 0x4a2a15 }));
+    leg.position.set(lx, 0.35, -0.5 + lz); group.add(leg);
+  }
+
+  group.position.set(cx, 0, cz);
+  scene.add(group);
+
+  rooms.push({
+    name, cx, cz, halfW: halfW - 0.3, halfD: halfD - 0.3, h,
+    minX: cx - halfW + 0.4, maxX: cx + halfW - 0.4,
+    minZ: cz - halfD + 0.4, maxZ: cz + halfD - 0.4
+  });
+  return group;
+}
+
+function isInsideRoom(x, z) {
+  for (const r of rooms) {
+    if (x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ) return r;
+  }
+  return null;
+}
+
+function addCollider(minX, maxX, minZ, maxZ, layer = 'overworld') {
+  colliders.push({ minX, maxX, minZ, maxZ, layer });
+}
+
+function activeColliders() {
+  const layer = inTower ? 'tower' : 'overworld';
+  return colliders.filter(c => c.layer === layer);
+}
+
+function hitsCollider(x, z, radius, list) {
+  for (const c of list) {
+    const nearestX = Math.max(c.minX, Math.min(x, c.maxX));
+    const nearestZ = Math.max(c.minZ, Math.min(z, c.maxZ));
+    const dx = x - nearestX;
+    const dz = z - nearestZ;
+    if (dx * dx + dz * dz < radius * radius) return true;
+  }
+  return false;
+}
+
+function resolveColliders(from, to, radius = 0.4) {
+  const list = activeColliders();
+  let x = to.x, z = to.z;
+
+  // Prefer sliding on one axis when blocked
+  if (hitsCollider(x, z, radius, list)) {
+    const tryX = { x: to.x, z: from.z };
+    const tryZ = { x: from.x, z: to.z };
+    if (!hitsCollider(tryX.x, tryX.z, radius, list)) {
+      x = tryX.x; z = tryX.z;
+    } else if (!hitsCollider(tryZ.x, tryZ.z, radius, list)) {
+      x = tryZ.x; z = tryZ.z;
+    } else {
+      x = from.x; z = from.z;
+    }
+  }
+
+  // Soft push-out if still overlapping (prevents stuck in walls)
+  for (const c of list) {
+    const nearestX = Math.max(c.minX, Math.min(x, c.maxX));
+    const nearestZ = Math.max(c.minZ, Math.min(z, c.maxZ));
+    let dx = x - nearestX;
+    let dz = z - nearestZ;
+    const dist = Math.hypot(dx, dz);
+    if (dist < radius && dist > 0.0001) {
+      const push = (radius - dist) + 0.01;
+      x += (dx / dist) * push;
+      z += (dz / dist) * push;
+    } else if (dist < radius) {
+      // Center inside box — push toward entry direction
+      x = from.x;
+      z = from.z;
+    }
+  }
+
+  return new THREE.Vector3(x, to.y, z);
+}
+
+function createWorld() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0xb0c8e0, 0.008);
+
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+  scene.add(ambientLight);
+
+  sunLight = new THREE.DirectionalLight(0xfff5e0, 1.05);
+  sunLight.position.set(40, 60, 20);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.near = 5;
+  sunLight.shadow.camera.far = 160;
+  sunLight.shadow.camera.left = -70;
+  sunLight.shadow.camera.right = 70;
+  sunLight.shadow.camera.top = 70;
+  sunLight.shadow.camera.bottom = -70;
+  sunLight.shadow.bias = -0.0004;
+  scene.add(sunLight);
+
+  createSky();
+  createGround();
+
+  // Elder Mira's house — enterable room with wooden floor
+  createRoom(-8, -6, 7, 6, 3.2, 0x6b4e30, 0x6b5040, "Elder Mira's House");
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(5.5, 2.8, 4), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 }));
+  roof.position.set(-8, 4.6, -6); roof.rotation.y = Math.PI/4; roof.castShadow = true; scene.add(roof);
+  const doorLamp = new THREE.PointLight(0xff9944, 0.65, 8);
+  doorLamp.position.set(-8, 2.2, -2.8); scene.add(doorLamp);
+
+  // Merchant shop
+  createRoom(9, -5, 6, 5.5, 3.0, 0x5a4530, 0x5a4535, "Merchant's Shop");
+  const roof2 = new THREE.Mesh(new THREE.ConeGeometry(4.8, 2.5, 4), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 }));
+  roof2.position.set(9, 4.3, -5); roof2.rotation.y = Math.PI/4; roof2.castShadow = true; scene.add(roof2);
+
+  // Lira's hut
+  createRoom(12, 16, 5, 5, 2.8, 0x3a3a48, 0x4a4a5a, "Lira's Hut");
+  const roof3 = new THREE.Mesh(new THREE.ConeGeometry(4, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x2a2a35, roughness: 0.9 }));
+  roof3.position.set(12, 4.0, 16); roof3.rotation.y = Math.PI/4; scene.add(roof3);
+
+  function makeSimpleHouse(x, z, rot) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4.5), new THREE.MeshStandardMaterial({ color: 0x5a4535, roughness: 0.85 }));
+    body.position.y = 1.5; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const r = new THREE.Mesh(new THREE.ConeGeometry(3.3, 2.2, 4), new THREE.MeshStandardMaterial({ color: 0x3a2a1a }));
+    r.position.y = 4.1; r.rotation.y = Math.PI/4; r.castShadow = true; g.add(r);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x2a1a10 }));
+    door.position.set(0, 0.8, 2.3); g.add(door);
+    g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g);
+    // Solid exterior collision (no entry)
+    addCollider(x - 2.2, x + 2.2, z - 2.4, z + 2.4);
+  }
+  makeSimpleHouse(-12, 4, 0.4);
+  makeSimpleHouse(6, 6, -0.2);
+  // Outer walls of enterable houses (leave door side more open)
+  addCollider(-8 - 3.6, -8 + 3.6, -6 - 3.2, -6 - 0.5); // Mira back
+  addCollider(-8 - 3.6, -8 - 3.2, -6 - 3.2, -6 + 3.2); // Mira left
+  addCollider(-8 + 3.2, -8 + 3.6, -6 - 3.2, -6 + 3.2); // Mira right
+  addCollider(9 - 3.1, 9 + 3.1, -5 - 2.9, -5 - 0.5);
+  addCollider(9 - 3.1, 9 - 2.8, -5 - 2.9, -5 + 2.9);
+  addCollider(9 + 2.8, 9 + 3.1, -5 - 2.9, -5 + 2.9);
+  addCollider(12 - 2.6, 12 + 2.6, 16 - 2.6, 16 - 0.5);
+  addCollider(12 - 2.6, 12 - 2.3, 16 - 2.6, 16 + 2.6);
+  addCollider(12 + 2.3, 12 + 2.6, 16 - 2.6, 16 + 2.6);
+  // Tower outer solid (except entry when unlocked)
+  // Soft ring around tower base — leave approach space on south for interaction
+  addCollider(-4.5, 4.5, 80 - 2.5, 80 + 4.5); // open southern approach
+
+  function makeTree(x, z, s = 1) {
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2*s, 0.3*s, 2.6*s, 8), new THREE.MeshStandardMaterial({ color: 0x3a2a1a }));
+    trunk.position.y = 1.3*s; trunk.castShadow = true; g.add(trunk);
+    const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.5*s, 8, 6), new THREE.MeshStandardMaterial({ color: 0x2a5a2a, roughness: 0.9 }));
+    leaves.position.y = 3.3*s; leaves.castShadow = true; g.add(leaves);
+    g.position.set(x, 0, z); scene.add(g);
+    // Solid trunk collision (not the leafy canopy only)
+    const r = 0.45 * s;
+    addCollider(x - r, x + r, z - r, z + r);
+  }
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random()*Math.PI*2, r = 22 + Math.random()*50;
+    makeTree(Math.cos(a)*r, Math.sin(a)*r, 0.75 + Math.random()*0.5);
+  }
+  makeTree(-5, 14, 1.1); makeTree(6, 24, 0.95); makeTree(-4, 42, 1.15);
+
+  // Bushes — no collision (can walk through)
+  for (let i = 0; i < 18; i++) {
+    const bush = new THREE.Mesh(new THREE.SphereGeometry(0.6+Math.random()*0.4, 7, 5), new THREE.MeshStandardMaterial({ color: 0x1e4a1e, roughness: 0.95 }));
+    bush.position.set((Math.random()-0.5)*60, 0.35, (Math.random()-0.5)*70);
+    bush.scale.y = 0.65; scene.add(bush);
+  }
+  for (let i = 0; i < 15; i++) {
+    const rs = 0.5 + Math.random() * 0.5;
+    const rx = (Math.random()-0.5)*80;
+    const rz = (Math.random()-0.5)*80;
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rs, 0), new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.95, flatShading: true }));
+    rock.position.set(rx, 0.3, rz);
+    rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock);
+    const cr = rs * 0.85;
+    addCollider(rx - cr, rx + cr, rz - cr, rz + cr);
+  }
+
+  const fireLight = new THREE.PointLight(0xff6622, 1.3, 16);
+  fireLight.position.set(0, 1.5, -1); scene.add(fireLight);
+  scene.userData.fireLight = fireLight;
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.2, 6), new THREE.MeshStandardMaterial({ color: 0x3a2a15 }));
+  log.rotation.z = Math.PI/2; log.position.set(0, 0.15, -1); scene.add(log);
+  for (let i = 0; i < 10; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.05+Math.random()*0.04, 4, 4), new THREE.MeshBasicMaterial({ color: 0xff6622, transparent: true, opacity: 0.8 }));
+    p.userData = { baseY: 0.4, speed: 0.9+Math.random(), phase: Math.random()*10 };
+    p.position.set(0, 0.5, -1); scene.add(p); particles.push(p);
+  }
+
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(10, 3.5), new THREE.MeshStandardMaterial({ color: 0x2a4a5a, roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.8 }));
+  water.rotation.x = -Math.PI/2; water.position.set(0, 0.04, 30); scene.add(water);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.18, 5.5), new THREE.MeshStandardMaterial({ color: 0x6b4e30, roughness: 0.9 }));
+  bridge.position.set(0, 0.22, 30); bridge.castShadow = true; scene.add(bridge);
+  for (const s of [-1.7, 1.7]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 5.5), new THREE.MeshStandardMaterial({ color: 0x5a3a20 }));
+    rail.position.set(s, 0.5, 30); scene.add(rail);
+  }
+
+  for (let i = 0; i < 6; i++) {
+    const h = 1.8 + Math.random()*3;
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, h, 8), new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.9, flatShading: true }));
+    p.position.set((Math.random()-0.5)*14, h/2, 58 + Math.random()*14);
+    p.rotation.z = (Math.random()-0.5)*0.25; p.castShadow = true; scene.add(p);
+  }
+
+  const tower = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 4.3, 7, 8), new THREE.MeshStandardMaterial({ color: 0x2a2a38, roughness: 0.9 }));
+  base.position.y = 3.5; base.castShadow = true; tower.add(base);
+  const mid = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3, 12, 8), new THREE.MeshStandardMaterial({ color: 0x222230, roughness: 0.9 }));
+  mid.position.y = 13; mid.castShadow = true; tower.add(mid);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 7, 8), new THREE.MeshStandardMaterial({ color: 0x1a1a28, roughness: 0.9 }));
+  top.position.y = 22.5; tower.add(top);
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4.5, 8), new THREE.MeshStandardMaterial({ color: 0x151520 }));
+  spire.position.y = 28; tower.add(spire);
+  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x88aaff, emissive: 0x3366cc, emissiveIntensity: 1 }));
+  crystal.position.y = 26.5; tower.add(crystal);
+  scene.userData.crystal = crystal;
+  tower.position.set(0, 0, 80);
+  scene.add(tower);
+  interactables.push({ mesh: tower, type: 'tower', radius: 9 });
+  // Crystal claim zone at tower base (activated after entering)
+  const crystalZone = new THREE.Object3D();
+  crystalZone.position.set(0, 0, 80);
+  scene.add(crystalZone);
+  interactables.push({ mesh: crystalZone, type: 'crystal', radius: 4, active: false });
+
+  function makeChest(x, z) {
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 0.5), new THREE.MeshStandardMaterial({ color: 0x6b4e2e }));
+    chest.position.set(x, 0.25, z); chest.castShadow = true; scene.add(chest);
+    collectibles.push({ mesh: chest, type: 'chest', taken: false, radius: 1.7 });
+  }
+  makeChest(-10, 10); makeChest(9, 40); makeChest(-5, 62);
+
+  // Weapon pickups
+  const axePickup = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.08), new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7 }));
+  axePickup.position.set(4, 0.5, 12); scene.add(axePickup);
+  collectibles.push({ mesh: axePickup, type: 'weapon', weaponId: 'axe', name: 'Battle Axe', taken: false, radius: 1.6 });
+
+  const staffPickup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), new THREE.MeshStandardMaterial({ color: 0x4a3a5a }));
+  staffPickup.position.set(10, 0.7, 20); scene.add(staffPickup);
+  const orbP = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0x66aaff, emissive: 0x2244aa, emissiveIntensity: 0.6 }));
+  orbP.position.set(10, 1.45, 20); scene.add(orbP);
+  collectibles.push({ mesh: staffPickup, type: 'weapon', weaponId: 'staff', name: 'Arcane Staff', taken: false, radius: 1.6, extra: orbP });
+}
+
+function createNPCs() {
+  const mira = createHuman(0xd4b89a, 0x5a3a6a, 0x6a5a4a, 0.95);
+  mira.position.set(-8, 0, -7.2);
+  mira.rotation.y = Math.PI * 0.15;
+  scene.add(mira);
+  npcs.push({
+    mesh: mira, name: 'Elder Mira', type: 'quest', radius: 2.4,
+    dialogues: {
+      0: {
+        text: "Kael, you came. The Crystal of Light was stolen by Malakar. Without it, night will eventually consume our land. I need you to find the mage Lira, clear the goblin-infested road, and reclaim the Crystal from the Forbidden Tower. Will you accept this quest?",
+        choices: [
+          { label: "I accept. Tell me what to do.", next: 'accept' },
+          { label: "Who is Malakar?", next: 'info' },
+          { label: "I need more time.", next: 'later' }
+        ]
+      },
+      accept: {
+        text: "Good. First: leave this house and follow the dirt path east. You will find Lira near the wooden bridge. She will guide you further. Take my blessing — and be careful.",
+        choices: [{ label: "I will not fail you.", next: 'end', action: 'startQuest' }]
+      },
+      info: {
+        text: "Malakar was once a high priest. Forbidden magic twisted him. He now rules the Forbidden Tower and feeds on the Crystal's power. Only returning it can restore the proper cycle of day and night.",
+        choices: [{ label: "I will stop him.", next: 'accept' }, { label: "This is dangerous...", next: 'later' }]
+      },
+      later: {
+        text: "The longer we wait, the stronger the shadow grows. Return when you are ready.",
+        choices: [{ label: "I'll come back.", next: 'end' }]
+      },
+      done: {
+        text: "You have the quest. Follow the path east to Lira. May the light guide you.",
+        choices: [{ label: "On my way.", next: 'end' }]
+      }
+    },
+    currentKey: '0'
+  });
+
+  const lira = createHuman(0xc9a07a, 0x2a4a6a, 0x1a1a2a, 0.92);
+  lira.position.set(11, 0, 19);
+  lira.rotation.y = -Math.PI * 0.5;
+  scene.add(lira);
+  const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0x4a3a2a }));
+  staff.position.set(0.45, 0.9, 0); lira.add(staff);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshStandardMaterial({ color: 0x66aaff, emissive: 0x2244aa, emissiveIntensity: 0.7 }));
+  orb.position.set(0.45, 1.85, 0); lira.add(orb);
+
+  npcs.push({
+    mesh: lira, name: 'Lira the Mage', type: 'quest', radius: 2.5,
+    dialogues: {
+      0: {
+        text: "You must be Kael. Elder Mira sent word. Goblin scouts loyal to Malakar block the road past this bridge. Defeat every one of them, then speak to me again. I will open the way to the Tower.",
+        choices: [
+          { label: "I'll clear the goblins.", next: 'ready' },
+          { label: "Any advice for the fight?", next: 'tips' }
+        ]
+      },
+      tips: {
+        text: "They are weak alone but swarm. Use your sword — or pick up the Battle Axe near the path and the Arcane Staff by my hut. Cycle weapons with the Y button.",
+        choices: [{ label: "Understood. I'll handle them.", next: 'ready' }]
+      },
+      ready: {
+        text: "The scouts are just past the bridge to the north. Strike them down, then return to me.",
+        choices: [{ label: "For Eldoria!", next: 'end', action: 'goblinQuest' }]
+      },
+      after: {
+        text: "Excellent work. The road is clear. Follow the path north to the Forbidden Tower. Climb to its base and claim the Crystal of Light. The land depends on you.",
+        choices: [{ label: "Onward to the Tower!", next: 'end', action: 'towerQuest' }]
+      },
+      final: {
+        text: "The Crystal awaits. Go, Kael. Restore the dawn.",
+        choices: [{ label: "I will.", next: 'end' }]
+      }
+    },
+    currentKey: '0'
+  });
+
+  const v1 = createHuman(0xc4a070, 0x4a5a3a, 0x3a2a1a, 0.9);
+  v1.position.set(3, 0, -4); scene.add(v1);
+  npcs.push({
+    mesh: v1, name: 'Villager Tomas', type: 'flavor', radius: 2.2,
+    dialogues: {
+      0: { text: "The Elder's house is the one with the lantern by the door, to the west of the square. She's been waiting for someone like you.", choices: [{ label: "Thanks.", next: 'end' }] }
+    }, currentKey: '0'
+  });
+}
+
+function createEnemies() {
+  for (let i = 0; i < 5; i++) {
+    const gob = createHuman(0x5a8a4a, 0x3a2a1a, 0x1a2a1a, 0.72);
+    gob.position.set((Math.random()-0.5)*10, 0, 38 + (Math.random()-0.5)*12);
+    gob.rotation.y = Math.random()*Math.PI*2;
+    scene.add(gob);
+    enemies.push({
+      mesh: gob, hp: 30+Math.floor(Math.random()*12), maxHp: 40,
+      attack: 8, alive: true, radius: 1.9, attackCooldown: 0,
+      aggroRange: 11, speed: 2.1 + Math.random()*0.4
+    });
+  }
+}
+
+function createPlayer() {
+  // Dolly / player root — moved by locomotion; headset camera is child of XR
+  dolly = new THREE.Group();
+  dolly.position.set(0, 0, -2);
+  scene.add(dolly);
+  player = dolly; // keep existing code that references player.position
+
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 300);
+  camera.position.set(0, 1.65, 0);
+  dolly.add(camera);
+
+  // First-person body (visible when looking down)
+  const body = new THREE.Group();
+  body.name = 'fpBody';
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xc4a88a, roughness: 0.7 });
+  const clothMat = new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.8 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2a2a38, roughness: 0.85 });
+
+  // Chest / torso visible below
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.5, 0.28), clothMat);
+  torso.position.set(0, -0.55, 0.05);
+  body.add(torso);
+
+  // Legs
+  const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.7, 8), pantsMat);
+  legL.position.set(-0.12, -1.15, 0.05);
+  body.add(legL);
+  const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.7, 8), pantsMat);
+  legR.position.set(0.12, -1.15, 0.05);
+  body.add(legR);
+
+  // Left arm (always a bit visible)
+  const armL = new THREE.Group();
+  const uaL = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.35, 8), clothMat);
+  uaL.position.set(0, -0.15, 0);
+  armL.add(uaL);
+  const faL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.3, 8), skinMat);
+  faL.position.set(0, -0.42, 0);
+  armL.add(faL);
+  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skinMat);
+  handL.position.set(0, -0.58, 0);
+  armL.add(handL);
+  armL.position.set(-0.35, -0.25, -0.25);
+  armL.rotation.set(0.4, 0.2, 0.5);
+  body.add(armL);
+
+  // Right arm holds weapon — positioned near viewmodel
+  const armR = new THREE.Group();
+  const uaR = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.35, 8), clothMat);
+  uaR.position.set(0, -0.15, 0);
+  armR.add(uaR);
+  const faR = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.3, 8), skinMat);
+  faR.position.set(0, -0.42, 0);
+  armR.add(faR);
+  const handR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skinMat);
+  handR.position.set(0, -0.58, 0);
+  armR.add(handR);
+  armR.position.set(0.32, -0.3, -0.35);
+  armR.rotation.set(0.5, -0.15, -0.55);
+  body.add(armR);
+
+  camera.add(body);
+  player.userData.fpBody = body;
+  player.userData.fpArmR = armR;
+  player.userData.fpArmL = armL;
+  player.userData.fpLegL = legL;
+  player.userData.fpLegR = legR;
+
+  // Viewmodel weapons (in right hand area)
+  const swordG = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.65, 0.02), new THREE.MeshStandardMaterial({ color: 0xc0c0c8, metalness: 0.85, roughness: 0.2 }));
+  blade.position.y = 0.35; swordG.add(blade);
+  const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.035), new THREE.MeshStandardMaterial({ color: 0x4a3020 }));
+  swordG.add(hilt);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.035, 0.045), new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 }));
+  guard.position.y = 0.08; swordG.add(guard);
+  swordG.position.set(0.28, -0.55, -0.55);
+  swordG.rotation.set(0.35, 0.1, -0.5);
+  camera.add(swordG);
+  weaponMeshes.sword = swordG;
+
+  const axeG = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0x5a3a20 }));
+  handle.position.y = 0.28; axeG.add(handle);
+  const axeHead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.07), new THREE.MeshStandardMaterial({ color: 0x777780, metalness: 0.7 }));
+  axeHead.position.set(0.1, 0.6, 0); axeG.add(axeHead);
+  axeG.position.set(0.3, -0.55, -0.5);
+  axeG.rotation.set(0.4, 0.1, -0.55);
+  axeG.visible = false;
+  camera.add(axeG);
+  weaponMeshes.axe = axeG;
+
+  const staffG = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.85, 6), new THREE.MeshStandardMaterial({ color: 0x3a2a4a }));
+  pole.position.y = 0.32; staffG.add(pole);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshStandardMaterial({ color: 0x66aaff, emissive: 0x2244aa, emissiveIntensity: 0.8 }));
+  orb.position.y = 0.8; staffG.add(orb);
+  staffG.position.set(0.28, -0.45, -0.55);
+  staffG.rotation.set(0.25, 0, -0.4);
+  staffG.visible = false;
+  camera.add(staffG);
+  weaponMeshes.staff = staffG;
+
+  weaponMeshes.fists = null;
+  updateWeaponVisual();
+}
+
+function updateWeaponVisual() {
+  const w = weapons[currentWeapon];
+  Object.keys(weaponMeshes).forEach(k => {
+    if (weaponMeshes[k]) weaponMeshes[k].visible = (k === w.id);
+  });
+  document.getElementById('weapon-name').textContent = w.name;
+  document.getElementById('weapon-hud').classList.add('show');
+}
+
+function switchWeapon(idx) {
+  if (idx < 0 || idx >= weapons.length) return;
+  const w = weapons[idx];
+  if (w.id !== 'fists') {
+    const owned = inventory.find(i => i.type === 'weapon' && i.weaponId === w.id);
+    if (!owned) return;
+  }
+  currentWeapon = idx;
+  updateWeaponVisual();
+}
+
+function setupControls() {
+  // VR controllers — left = move, right = turn + primary actions
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -1)
+  ]);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xd4a84b, transparent: true, opacity: 0.6 });
+
+  controller0 = renderer.xr.getController(0);
+  controller0.add(new THREE.Line(geo, lineMat));
+  controller0.addEventListener('selectstart', onSelectStart);
+  controller0.addEventListener('squeezestart', onSqueezeStart);
+  controller0.addEventListener('squeezeend', onSqueezeEnd);
+  dolly.add(controller0);
+
+  controller1 = renderer.xr.getController(1);
+  controller1.add(new THREE.Line(geo.clone(), lineMat.clone()));
+  controller1.addEventListener('selectstart', onSelectStart);
+  controller1.addEventListener('squeezestart', onSqueezeStart);
+  controller1.addEventListener('squeezeend', onSqueezeEnd);
+  dolly.add(controller1);
+
+  // Simple grip placeholders (no external XRControllerModelFactory dependency)
+  controllerGrip0 = renderer.xr.getControllerGrip(0);
+  dolly.add(controllerGrip0);
+  controllerGrip1 = renderer.xr.getControllerGrip(1);
+  dolly.add(controllerGrip1);
+
+  // Poll gamepads every frame in animate via updateVRInput()
+}
+
+function onSelectStart(event) {
+  if (!gameStarted || inDialogue || inventoryOpen) {
+    // In dialogue: select first choice if any
+    if (inDialogue) {
+      const btn = document.querySelector('#dialogue-choices .choice-btn');
+      if (btn) btn.click();
+    }
+    return;
+  }
+  // Right controller preferred for attack; either works
+  tryAttack();
+}
+
+function onSqueezeStart(event) {
+  vrSprint = true;
+  if (!gameStarted || inDialogue || inventoryOpen) return;
+  tryInteract();
+}
+
+function onSqueezeEnd() {
+  vrSprint = false;
+}
+
+function updateVRInput() {
+  moveAxes.x = 0; moveAxes.y = 0;
+  turnAxes.x = 0; turnAxes.y = 0;
+  const session = renderer.xr.getSession();
+  if (!session) return;
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+    const gp = source.gamepad;
+    // Quest: axes[2]=x, axes[3]=y for thumbstick
+    const ax = gp.axes.length >= 4 ? 2 : 0;
+    const ay = gp.axes.length >= 4 ? 3 : 1;
+    const x = gp.axes[ax] || 0;
+    const y = gp.axes[ay] || 0;
+    if (source.handedness === 'left') {
+      moveAxes.x = Math.abs(x) > 0.15 ? x : 0;
+      moveAxes.y = Math.abs(y) > 0.15 ? y : 0;
+      // X button often index 4 — inventory
+      if (gp.buttons[4] && gp.buttons[4].pressed) {
+        if (!updateVRInput._invLatch) { toggleInventory(); updateVRInput._invLatch = true; }
+      } else { updateVRInput._invLatch = false; }
+      // Y button index 5 — cycle weapon
+      if (gp.buttons[5] && gp.buttons[5].pressed) {
+        if (!updateVRInput._wepLatch) {
+          const next = (currentWeapon % 3) + 1;
+          switchWeapon(next);
+          updateVRInput._wepLatch = true;
+        }
+      } else { updateVRInput._wepLatch = false; }
+    } else if (source.handedness === 'right') {
+      turnAxes.x = Math.abs(x) > 0.15 ? x : 0;
+      turnAxes.y = Math.abs(y) > 0.15 ? y : 0;
+      // A button — interact
+      if (gp.buttons[4] && gp.buttons[4].pressed) {
+        if (!updateVRInput._intLatch) { tryInteract(); updateVRInput._intLatch = true; }
+      } else { updateVRInput._intLatch = false; }
+      // B button — inventory
+      if (gp.buttons[5] && gp.buttons[5].pressed) {
+        if (!updateVRInput._invLatchR) { toggleInventory(); updateVRInput._invLatchR = true; }
+      } else { updateVRInput._invLatchR = false; }
+    }
+  }
+}
+
+function tryInteractOrAttack() {
+  if (tryInteract()) return;
+  tryAttack();
+}
+
+function tryInteract() {
+  for (const c of collectibles) {
+    if (c.taken) continue;
+    const d = player.position.distanceTo(c.mesh.position);
+    if (d < c.radius) {
+      c.taken = true;
+      c.mesh.visible = false;
+      if (c.extra) c.extra.visible = false;
+      if (c.type === 'chest') {
+        playerStats.gold += 12 + Math.floor(Math.random()*18);
+        const pot = inventory.find(i => i.id === 'potion');
+        if (pot) pot.qty += 1; else inventory.push({ id: 'potion', name: 'Health Potion', qty: 1, type: 'consumable' });
+        inventory.push({ id: 'gem'+Date.now(), name: 'Twilight Gem', qty: 1, type: 'treasure' });
+        playSFX('pickup');
+        showTempMessage('Chest opened! +Gold, +Potion, +Twilight Gem');
+      } else if (c.type === 'weapon') {
+        inventory.push({ id: c.weaponId, name: c.name, qty: 1, type: 'weapon', weaponId: c.weaponId });
+        playSFX('pickup');
+        showTempMessage('You picked up the ' + c.name + '! Press 1-3 to switch weapons.');
+        const idx = weapons.findIndex(w => w.id === c.weaponId);
+        if (idx >= 0) switchWeapon(idx);
+      }
+      return true;
+    }
+  }
+  for (const npc of npcs) {
+    if (player.position.distanceTo(npc.mesh.position) < npc.radius) {
+      // Quest gating: Lira only after accepting Mira's quest
+      if (npc.name === 'Lira the Mage' && questStage < 1) {
+        showTempMessage("Lira looks busy. Elder Mira in the village asked to see you first — find her house (west of the square, lantern by the door).");
+        return true;
+      }
+      openDialogue(npc);
+      return true;
+    }
+  }
+  for (const obj of interactables) {
+    if (obj.type === 'tower' && player.position.distanceTo(obj.mesh.position) < obj.radius) {
+      if (questStage >= 3 && !inTower) {
+        enterTowerInterior();
+      } else if (questStage < 3) {
+        showTempMessage('The tower is sealed by dark magic. Complete the earlier quest steps first (check your Quest Log).');
+      }
+      return true;
+    }
+    if (obj.type === 'torch' && obj.active) {
+      const dx = player.position.x - obj.mesh.position.x;
+      const dz = player.position.z - obj.mesh.position.z;
+      if (Math.hypot(dx, dz) < obj.radius) {
+        lightTorch(obj.torchIndex);
+        return true;
+      }
+    }
+    if (obj.type === 'plaque' && obj.active && player.position.distanceTo(obj.mesh.position) < obj.radius) {
+      showTempMessage('Riddle: "Sky before blood, then the royal purple veil. Life\'s green follows, and last the sun\'s reward."');
+      playSFX('talk');
+      return true;
+    }
+    if (obj.type === 'crystal' && obj.active && player.position.distanceTo(obj.mesh.position) < obj.radius) {
+      if (boss && boss.alive) {
+        showTempMessage('Malakar blocks the Crystal! Defeat him first.');
+      } else {
+        openTowerDialogue();
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+function tryAttack() {
+  if (attackCooldown > 0) return;
+  const w = weapons[currentWeapon];
+  attackCooldown = w.cooldown;
+  playSFX('swing');
+  const mesh = weaponMeshes[w.id];
+  if (mesh) {
+    mesh.rotation.x = -1.1;
+    setTimeout(() => { if (mesh) mesh.rotation.x = 0.15; }, 180);
+  }
+  function hitEnemy(en, w) {
+    if (!en || !en.alive) return;
+    const d = player.position.distanceTo(en.mesh.position);
+    if (d < w.range) {
+      const toEn = new THREE.Vector3().subVectors(en.mesh.position, player.position).normalize();
+      let fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      if (renderer.xr.isPresenting) {
+        const xrCam = renderer.xr.getCamera(camera);
+        xrCam.getWorldDirection(fwd);
+        fwd.y = 0;
+        if (fwd.lengthSq() > 0.0001) fwd.normalize();
+      }
+      if (toEn.dot(fwd) > 0.15 || d < 2.2) {
+        const dmg = w.dmg + Math.floor(Math.random()*6) + (w.magic ? 4 : 0);
+        en.hp -= dmg;
+        if (en.hp <= 0) {
+          en.alive = false;
+          en.mesh.visible = false;
+          if (en.name === 'Malakar') {
+            gainXP(100);
+            playerStats.gold += 50;
+            // Update quest progress after boss death
+            QUEST[3] = {
+              id: 3, title: 'Heart of the Tower',
+              text: 'Malakar is defeated! Approach the Crystal of Light and claim it to restore the dawn.',
+              steps: ['✓ Entered the Tower', '✓ Confronted Malakar', '✓ Defeated Malakar', 'Claim the Crystal']
+            };
+            updateQuestUI();
+            for (const o of interactables) {
+              if (o.type === 'crystal') o.active = true;
+            }
+            playSFX('victory');
+            speak('Malakar', 'No... the light... returns...');
+            showTempMessage('Malakar falls! The Crystal is unprotected — approach it and press E / TALK to claim it.');
+          } else {
+            playSFX('hit');
+            gainXP(20 + Math.floor(Math.random()*12));
+            playerStats.gold += 5 + Math.floor(Math.random()*8);
+            checkGoblinsCleared();
+          }
+        }
+      }
+    }
+  }
+  enemies.forEach(en => hitEnemy(en, w));
+  if (boss) hitEnemy(boss, w);
+}
+
+function checkGoblinsCleared() {
+  if (questStage === 2 && enemies.every(e => !e.alive)) {
+    questStage = 3;
+    updateQuestUI();
+    const lira = npcs.find(n => n.name === 'Lira the Mage');
+    if (lira) lira.currentKey = 'after';
+  }
+}
+
+// Tower puzzle state — harder sequence of 5 runes
+let towerPuzzleOrder = [];
+const TOWER_PUZZLE_SOLUTION = [2, 0, 4, 1, 3]; // Azure, Crimson, Violet, Emerald, Gold
+let towerDoorOpen = false;
+let bossCutscenePlayed = false;
+
+function enterTowerInterior() {
+  inTower = true;
+  const TY = -55;
+  // Start in entrance hall (south of puzzle room)
+  player.position.set(0, TY, 18);
+  yaw = Math.PI;
+  if (dolly) dolly.rotation.y = yaw;
+  playSFX('door');
+
+  if (!scene.userData.towerInteriorBuilt) {
+    scene.userData.towerInteriorBuilt = true;
+    const stone = new THREE.MeshStandardMaterial({ color: 0x1e1e2a, roughness: 0.9 });
+    const stoneLit = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.85 });
+
+    function roomBox(x, z, w, d, h, doors = {}) {
+      // doors: { north, south, east, west } gap half-width
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), stone);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.set(x, TY + 0.05, z);
+      floor.receiveShadow = true;
+      scene.add(floor);
+      const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: 0x0a0a14 }));
+      ceil.rotation.x = Math.PI / 2;
+      ceil.position.set(x, TY + h, z);
+      scene.add(ceil);
+
+      const hw = w / 2, hd = d / 2;
+      const thick = 0.5;
+      const gap = 1.3; // half door gap
+
+      function wallSeg(wx, wz, bw, bd) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(bw, h, bd), stoneLit);
+        wall.position.set(wx, TY + h / 2, wz);
+        wall.castShadow = true;
+        scene.add(wall);
+        addCollider(wx - bw / 2, wx + bw / 2, wz - bd / 2, wz + bd / 2, 'tower');
+      }
+
+      // North wall (+z relative? in our layout north is -z toward boss)
+      // South wall (higher z)
+      if (doors.south) {
+        const open = gap * 2;
+        const side = (w - open) / 2;
+        if (side > 0.2) {
+          wallSeg(x - hw + side / 2, z + hd, side, thick);
+          wallSeg(x + hw - side / 2, z + hd, side, thick);
+        }
+      } else {
+        wallSeg(x, z + hd, w + thick, thick);
+      }
+      // North wall (lower z)
+      if (doors.north) {
+        const open = gap * 2;
+        const side = (w - open) / 2;
+        if (side > 0.2) {
+          wallSeg(x - hw + side / 2, z - hd, side, thick);
+          wallSeg(x + hw - side / 2, z - hd, side, thick);
+        }
+      } else {
+        wallSeg(x, z - hd, w + thick, thick);
+      }
+      // West / East
+      if (doors.west) {
+        const open = gap * 2;
+        const side = (d - open) / 2;
+        if (side > 0.2) {
+          wallSeg(x - hw, z - hd + side / 2, thick, side);
+          wallSeg(x - hw, z + hd - side / 2, thick, side);
+        }
+      } else {
+        wallSeg(x - hw, z, thick, d + thick);
+      }
+      if (doors.east) {
+        const open = gap * 2;
+        const side = (d - open) / 2;
+        if (side > 0.2) {
+          wallSeg(x + hw, z - hd + side / 2, thick, side);
+          wallSeg(x + hw, z + hd - side / 2, thick, side);
+        }
+      } else {
+        wallSeg(x + hw, z, thick, d + thick);
+      }
+
+      const light = new THREE.PointLight(0x6688aa, 0.9, 18);
+      light.position.set(x, TY + h - 1, z);
+      scene.add(light);
+    }
+
+    // Room 1: Entrance hall (door north to puzzle)
+    roomBox(0, 18, 12, 10, 6, { north: true });
+
+    // Room 2: Puzzle chamber (doors south to hall, north sealed until puzzle)
+    roomBox(0, 5, 16, 12, 6, { south: true, north: true });
+
+    // Room 3: Boss arena
+    roomBox(0, -12, 18, 16, 8, { south: true });
+
+    // Corridor floor visual
+    const hallFloor = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x252535, roughness: 0.9 })
+    );
+    hallFloor.rotation.x = -Math.PI / 2;
+    hallFloor.position.set(0, TY + 0.06, 11.5);
+    scene.add(hallFloor);
+
+    // Harder puzzle: 5 runes — placed inward so none are blocked by walls
+    // Solution: Azure(2), Crimson(0), Violet(4), Emerald(1), Gold(3)
+    const torchColors = [0xff4422, 0x44ff88, 0x4488ff, 0xffcc22, 0xaa44ff];
+    const torchLabels = ['Crimson', 'Emerald', 'Azure', 'Gold', 'Violet'];
+    // Arc in the middle of the room (reachable from front)
+    const placeX = [-4, -2, 0, 2, 4];
+    const placeZ = [6.5, 6.5, 6.5, 6.5, 6.5];
+    scene.userData.torches = [];
+    for (let i = 0; i < 5; i++) {
+      const tx = placeX[i];
+      const tz = placeZ[i];
+      const stand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.18, 1.4, 8),
+        new THREE.MeshStandardMaterial({ color: 0x3a3a48 })
+      );
+      stand.position.set(tx, TY + 0.7, tz);
+      scene.add(stand);
+      const flame = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: torchColors[i],
+          emissive: torchColors[i],
+          emissiveIntensity: 0.2
+        })
+      );
+      flame.position.set(tx, TY + 1.55, tz);
+      scene.add(flame);
+      const pl = new THREE.PointLight(torchColors[i], 0.25, 7);
+      pl.position.set(tx, TY + 1.6, tz);
+      scene.add(pl);
+      scene.userData.torches.push({ flame, light: pl, lit: false, index: i, label: torchLabels[i] });
+      interactables.push({
+        mesh: stand,
+        type: 'torch',
+        torchIndex: i,
+        radius: 2.8,
+        active: true
+      });
+    }
+
+    // Sealed door to boss room — thick solid collider (tower layer only)
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(5, 5.5, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x3a2040, emissive: 0x220033, emissiveIntensity: 0.3 })
+    );
+    door.position.set(0, TY + 2.7, -1.2);
+    scene.add(door);
+    scene.userData.towerDoor = door;
+    scene.userData.towerDoorCollider = { minX: -2.6, maxX: 2.6, minZ: -1.6, maxZ: -0.8, layer: 'tower' };
+    addCollider(-2.6, 2.6, -1.6, -0.8, 'tower');
+
+    // Crystal + altar in boss room
+    const crystal = new THREE.Mesh(
+      new THREE.OctahedronGeometry(1.3, 0),
+      new THREE.MeshStandardMaterial({ color: 0x88aaff, emissive: 0x3366cc, emissiveIntensity: 1.2 })
+    );
+    crystal.position.set(0, TY + 3.2, -16);
+    scene.add(crystal);
+    scene.userData.innerCrystal = crystal;
+    interactables.push({ mesh: crystal, type: 'crystal', radius: 3.5, active: false });
+
+    const altar = new THREE.Mesh(
+      new THREE.CylinderGeometry(2, 2.4, 0.4, 8),
+      new THREE.MeshStandardMaterial({ color: 0x2a2035, emissive: 0x221133, emissiveIntensity: 0.4 })
+    );
+    altar.position.set(0, TY + 0.25, -16);
+    scene.add(altar);
+
+    // Throne / chair
+    const chair = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.25, 1.2), new THREE.MeshStandardMaterial({ color: 0x2a1520 }));
+    seat.position.y = 0.7;
+    chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 0.2), new THREE.MeshStandardMaterial({ color: 0x1a0a15 }));
+    back.position.set(0, 1.5, -0.5);
+    chair.add(back);
+    chair.position.set(0, TY, -14);
+    scene.add(chair);
+    scene.userData.throne = chair;
+
+    // Boss seated (inactive until cutscene)
+    const mal = createHuman(0x4a3a5a, 0x1a0a2a, 0x0a0510, 1.4);
+    mal.position.set(0, TY + 0.55, -14);
+    mal.rotation.x = 0.15; // seated lean
+    scene.add(mal);
+    boss = {
+      mesh: mal,
+      hp: 200,
+      maxHp: 200,
+      attack: 15,
+      alive: true,
+      radius: 2.6,
+      attackCooldown: 0,
+      aggroRange: 0,
+      speed: 2.5,
+      name: 'Malakar'
+    };
+
+    // Hint plaque — riddle, not direct order
+    const plaque = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 1.4, 0.15),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a28 })
+    );
+    plaque.position.set(0, TY + 1.9, 10);
+    scene.add(plaque);
+    interactables.push({ mesh: plaque, type: 'plaque', radius: 2.5, active: true });
+  }
+
+  questStage = 3;
+  QUEST[3] = {
+    id: 3, title: 'Heart of the Tower',
+    text: 'Read the stone plaque, then light the five runes in the correct order to open the sealed door.',
+    steps: ['✓ Entered the Tower', 'Solve the rune puzzle', 'Confront Malakar', 'Defeat Malakar', 'Claim the Crystal']
+  };
+  updateQuestUI();
+
+  cutsceneActive = true;
+  inDialogue = true;
+  
+  document.getElementById('dialogue-name').textContent = 'Forbidden Tower';
+  document.getElementById('dialogue-text').textContent =
+    'You descend beneath the earth into cold stone halls. A sealed door blocks the throne chamber. Five colored runes stand in the puzzle room — and a weathered plaque holds a riddle.';
+  speak('Narrator', 'You descend into the Forbidden Tower. Solve the rune riddle to reach Malakar.');
+  const choices = document.getElementById('dialogue-choices');
+  choices.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn';
+  btn.textContent = 'Begin the trial';
+  btn.onclick = () => {
+    cutsceneActive = false;
+    closeDialogue();
+    
+  };
+  choices.appendChild(btn);
+  document.getElementById('dialogue').classList.add('visible');
+}
+
+function lightTorch(index) {
+  if (towerDoorOpen) return;
+  const torches = scene.userData.torches;
+  if (!torches || !torches[index]) return;
+  const torch = torches[index];
+  if (torch.lit) {
+    showTempMessage('This torch is already lit.');
+    return;
+  }
+  torch.lit = true;
+  torch.flame.material.emissiveIntensity = 1.2;
+  torch.light.intensity = 1.1;
+  playSFX('puzzle');
+  towerPuzzleOrder.push(index);
+
+  // Check sequence so far
+  for (let i = 0; i < towerPuzzleOrder.length; i++) {
+    if (towerPuzzleOrder[i] !== TOWER_PUZZLE_SOLUTION[i]) {
+      // Reset all
+      showTempMessage('Wrong order! The runes snuff out. Re-read the plaque riddle and try again.');
+      playSFX('hurt');
+      torches.forEach(t => {
+        t.lit = false;
+        t.flame.material.emissiveIntensity = 0.15;
+        t.light.intensity = 0.2;
+      });
+      towerPuzzleOrder = [];
+      return;
+    }
+  }
+
+  if (towerPuzzleOrder.length === TOWER_PUZZLE_SOLUTION.length) {
+    towerDoorOpen = true;
+    playSFX('door');
+    playSFX('victory');
+    if (scene.userData.towerDoor) {
+      scene.userData.towerDoor.visible = false;
+      scene.userData.towerDoor.position.y = -999;
+    }
+    // Remove sealed door collider
+    const dc = scene.userData.towerDoorCollider;
+    if (dc) {
+      for (let i = colliders.length - 1; i >= 0; i--) {
+        const c = colliders[i];
+        if (c.layer === 'tower' && c.minX === dc.minX && c.maxX === dc.maxX && c.minZ === dc.minZ && c.maxZ === dc.maxZ) {
+          colliders.splice(i, 1);
+        }
+      }
+    }
+    QUEST[3] = {
+      id: 3, title: 'Heart of the Tower',
+      text: 'The sealed door is open! Enter the throne chamber and confront Malakar.',
+      steps: ['✓ Entered the Tower', '✓ Solved the rune puzzle', 'Confront Malakar', 'Defeat Malakar', 'Claim the Crystal']
+    };
+    updateQuestUI();
+    showTempMessage('The sealed door grinds open. Malakar sits on his throne in the chamber beyond.');
+  } else {
+    showTempMessage(torch.label + ' rune lit. (' + towerPuzzleOrder.length + '/5)');
+  }
+}
+
+function startBossCutscene() {
+  if (!boss || boss.aggroRange > 0 || cutsceneActive || bossCutscenePlayed) return;
+  bossCutscenePlayed = true;
+  cutsceneActive = true;
+  inDialogue = true;
+  
+
+  const TY = -55;
+  const choices = document.getElementById('dialogue-choices');
+
+  // Step 1: walking up
+  document.getElementById('dialogue-name').textContent = 'Throne Chamber';
+  document.getElementById('dialogue-text').textContent =
+    'You walk across the cold stone toward the throne. Malakar sits motionless, a shadow crowned in silence...';
+  speak('Narrator', 'You walk toward the throne. Malakar sits in silence.');
+  playSFX('talk');
+  choices.innerHTML = '';
+  const b1 = document.createElement('button');
+  b1.className = 'choice-btn';
+  b1.textContent = 'Step closer';
+  b1.onclick = () => {
+    // Step 2: he rises from the chair
+    if (boss && boss.mesh) {
+      boss.mesh.position.set(0, TY, -13);
+      boss.mesh.rotation.x = 0;
+    }
+    document.getElementById('dialogue-name').textContent = 'Malakar';
+    document.getElementById('dialogue-text').textContent =
+      'So... the Elder sends a child to reclaim what is mine? The Crystal belongs to the night now. Kneel, or be broken.';
+    speak('Malakar', 'So the Elder sends a child to reclaim what is mine. The Crystal belongs to the night. Kneel, or be broken.');
+    playSFX('door');
+    choices.innerHTML = '';
+    const b2 = document.createElement('button');
+    b2.className = 'choice-btn';
+    b2.textContent = 'Give him the middle finger';
+    b2.onclick = () => {
+      // Step 3: flip-off, then fight
+      document.getElementById('dialogue-name').textContent = 'Kael';
+      document.getElementById('dialogue-text').textContent =
+        'You raise your hand and give Malakar the middle finger. His eyes burn with rage.';
+      speak('Narrator', 'You give Malakar the middle finger. He roars in fury.');
+      playSFX('swing');
+      // brief hand gesture on viewmodel
+      if (player.userData.fpArmL) {
+        const arm = player.userData.fpArmL;
+        const old = arm.rotation.clone();
+        arm.rotation.set(-0.8, 0.4, 1.2);
+        setTimeout(() => { arm.rotation.copy(old); }, 600);
+      }
+      choices.innerHTML = '';
+      const b3 = document.createElement('button');
+      b3.className = 'choice-btn';
+      b3.textContent = 'Fight!';
+      b3.onclick = () => {
+        cutsceneActive = false;
+        if (boss) boss.aggroRange = 22;
+        QUEST[3] = {
+          id: 3, title: 'Heart of the Tower',
+          text: 'Defeat Malakar, then claim the Crystal of Light!',
+          steps: ['✓ Entered the Tower', '✓ Solved the rune puzzle', '✓ Confronted Malakar', 'Defeat Malakar', 'Claim the Crystal']
+        };
+        updateQuestUI();
+        closeDialogue();
+        
+        showTempMessage('BOSS FIGHT: Defeat Malakar! Use sprint and your strongest weapon.');
+      };
+      choices.appendChild(b3);
+    };
+    choices.appendChild(b2);
+  };
+  choices.appendChild(b1);
+  document.getElementById('dialogue').classList.add('visible');
+}
+
+function openTowerDialogue() {
+  inDialogue = true;
+  
+  document.getElementById('dialogue-name').textContent = 'The Crystal of Light';
+  document.getElementById('dialogue-text').textContent =
+    'The Crystal pulses with pure radiance. You claim it, and warmth floods the land as the proper cycle of day and night returns to Eldoria.';
+  speak('Narrator', 'You claim the Crystal of Light. Dawn returns to Eldoria.');
+  playSFX('victory');
+  const choices = document.getElementById('dialogue-choices');
+  choices.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn';
+  btn.textContent = 'Restore the Dawn';
+  btn.onclick = () => {
+    questStage = 4;
+    QUEST[4] = {
+      id: 4, title: 'Dawn Restored',
+      text: 'You reclaimed the Crystal of Light! Day and night return to Eldoria. You are a true champion.',
+      steps: ['✓ Crystal reclaimed', 'Victory!']
+    };
+    updateQuestUI();
+    gainXP(150);
+    playerStats.hp = playerStats.maxHp;
+    playerStats.stamina = playerStats.maxStamina;
+    updateHUD();
+    closeDialogue();
+    showTempMessage('VICTORY! The Crystal is restored. You are the Champion of Eldoria.');
+  };
+  choices.appendChild(btn);
+  document.getElementById('dialogue').classList.add('visible');
+}
+
+function openDialogue(npc) {
+  inDialogue = true;
+  
+  const key = npc.currentKey || '0';
+  const node = npc.dialogues[key] || npc.dialogues['0'];
+  document.getElementById('dialogue-name').textContent = npc.name;
+  document.getElementById('dialogue-text').textContent = node.text;
+  playSFX('talk');
+  speak(npc.name, node.text);
+  const choices = document.getElementById('dialogue-choices');
+  choices.innerHTML = '';
+  node.choices.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = c.label;
+    btn.onclick = () => {
+      if (c.action === 'startQuest') { questStage = 1; updateQuestUI(); npc.currentKey = 'done'; }
+      if (c.action === 'goblinQuest') { questStage = 2; updateQuestUI(); npc.currentKey = 'after'; }
+      if (c.action === 'towerQuest') { questStage = 3; updateQuestUI(); npc.currentKey = 'final'; }
+      if (c.next === 'end') closeDialogue();
+      else { npc.currentKey = c.next; openDialogue(npc); }
+    };
+    choices.appendChild(btn);
+  });
+  document.getElementById('dialogue').classList.add('visible');
+}
+
+function closeDialogue() {
+  inDialogue = false;
+  document.getElementById('dialogue').classList.remove('visible');
+}
+
+function showTempMessage(msg) {
+  document.getElementById('dialogue-name').textContent = '';
+  document.getElementById('dialogue-text').textContent = msg;
+  document.getElementById('dialogue-choices').innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn';
+  btn.textContent = 'Continue';
+  btn.onclick = closeDialogue;
+  document.getElementById('dialogue-choices').appendChild(btn);
+  document.getElementById('dialogue').classList.add('visible');
+  inDialogue = true;
+  
+}
+
+function showDeathScreen() {
+  inDialogue = true;
+  
+  document.getElementById('dialogue-name').textContent = 'You Have Fallen';
+  document.getElementById('dialogue-text').textContent = 'Darkness claims you... but the Crystal still waits. Rise again, champion.';
+  const choices = document.getElementById('dialogue-choices');
+  choices.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'choice-btn';
+  btn.textContent = 'Retry';
+  btn.onclick = () => {
+    playerStats.hp = playerStats.maxHp;
+    playerStats.stamina = playerStats.maxStamina;
+    if (inTower) {
+      player.position.set(0, -55, 8);
+      if (boss && boss.alive) {
+        boss.hp = boss.maxHp;
+        boss.mesh.visible = true;
+        boss.mesh.position.set(0, -55, -5);
+        boss.aggroRange = 22;
+      }
+    } else {
+      player.position.set(0, 0, -2);
+    }
+    yaw = 0;
+    if (dolly) dolly.rotation.y = yaw;
+    updateHUD();
+    closeDialogue();
+    
+  };
+  choices.appendChild(btn);
+  document.getElementById('dialogue').classList.add('visible');
+}
+
+function toggleInventory() {
+  inventoryOpen = !inventoryOpen;
+  const inv = document.getElementById('inventory');
+  if (inventoryOpen) {
+    
+    renderInventory();
+    inv.classList.add('visible');
+  } else inv.classList.remove('visible');
+}
+
+function renderInventory() {
+  const list = document.getElementById('inv-list');
+  list.innerHTML = '';
+  inventory.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'inv-item';
+    if (item.type === 'weapon' && weapons[currentWeapon].id === item.weaponId) div.classList.add('equipped');
+    div.innerHTML = `<span>${item.name}${item.type==='weapon'?' (weapon)':''}</span><span class="qty">×${item.qty}</span>`;
+    div.style.cursor = 'pointer';
+    div.onclick = () => {
+      if (item.type === 'weapon') {
+        const idx = weapons.findIndex(w => w.id === item.weaponId);
+        if (idx >= 0) { switchWeapon(idx); renderInventory(); }
+      } else if (item.type === 'consumable' && item.id === 'potion' && item.qty > 0 && playerStats.hp < playerStats.maxHp) {
+        item.qty--;
+        playerStats.hp = Math.min(playerStats.maxHp, playerStats.hp + 45);
+        updateHUD();
+        if (item.qty <= 0) { const i = inventory.indexOf(item); if (i>-1) inventory.splice(i,1); }
+        renderInventory();
+      }
+    };
+    list.appendChild(div);
+  });
+  const g = document.createElement('div');
+  g.className = 'inv-item';
+  g.innerHTML = `<span>Gold</span><span class="qty">${playerStats.gold}</span>`;
+  list.appendChild(g);
+}
+
+function updateHUD() {
+  document.getElementById('hp-text').textContent = Math.max(0, Math.floor(playerStats.hp));
+  document.getElementById('hp-max').textContent = playerStats.maxHp;
+  document.getElementById('hp-bar').style.width = (playerStats.hp / playerStats.maxHp * 100) + '%';
+  document.getElementById('stamina-bar').style.width = (playerStats.stamina / playerStats.maxStamina * 100) + '%';
+  document.getElementById('level-text').textContent = playerStats.level;
+  document.getElementById('xp-text').textContent = playerStats.xp;
+  document.getElementById('xp-bar').style.width = (playerStats.xp / playerStats.xpToNext * 100) + '%';
+}
+
+function updateQuestUI() {
+  const q = QUEST[questStage];
+  document.getElementById('quest-title').textContent = q.title;
+  document.getElementById('quest-text').textContent = q.text;
+  const stepsEl = document.getElementById('quest-steps');
+  stepsEl.innerHTML = q.steps.map((s, i) => {
+    if (s.startsWith('✓')) return `<div class="done">${s}</div>`;
+    return `<div class="${i === q.steps.findIndex(x => !x.startsWith('✓')) ? 'current' : ''}">• ${s}</div>`;
+  }).join('');
+}
+
+function gainXP(amount) {
+  playerStats.xp += amount;
+  while (playerStats.xp >= playerStats.xpToNext) {
+    playerStats.xp -= playerStats.xpToNext;
+    playerStats.level++;
+    playerStats.maxHp += 20;
+    playerStats.hp = playerStats.maxHp;
+    playerStats.attack += 4;
+    playerStats.defense += 2;
+    playerStats.xpToNext = Math.floor(playerStats.xpToNext * 1.5);
+    const lu = document.getElementById('levelup');
+    lu.style.opacity = 1;
+    setTimeout(() => lu.style.opacity = 0, 1500);
+  }
+  updateHUD();
+}
+
+function animate() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.getElapsedTime();
+
+  updateDayNight(dt);
+  updateVRInput();
+
+  if (scene.userData.fireLight) {
+    scene.userData.fireLight.intensity = 1.0 + Math.sin(t*9)*0.3 + Math.random()*0.15;
+  }
+  particles.forEach(p => {
+    p.userData.phase += dt * p.userData.speed;
+    p.position.y = p.userData.baseY + (p.userData.phase * 0.4) % 1.6;
+    p.position.x = Math.sin(p.userData.phase*1.4)*0.2;
+    p.position.z = -1 + Math.cos(p.userData.phase)*0.15;
+    p.material.opacity = Math.max(0, 0.8 - (p.position.y - p.userData.baseY)*0.4);
+    if (p.position.y > p.userData.baseY + 1.5) p.userData.phase = 0;
+  });
+  if (scene.userData.crystal) {
+    scene.userData.crystal.rotation.y += dt*0.7;
+    scene.userData.crystal.position.y = 26.5 + Math.sin(t*2)*0.12;
+  }
+
+  if (attackCooldown > 0) attackCooldown -= dt;
+
+  if (!gameStarted || inDialogue || inventoryOpen) {
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // Snap-turn from right stick
+  if (Math.abs(turnAxes.x) > 0.7 && (t - lastTurnTime) > TURN_COOLDOWN) {
+    yaw -= Math.sign(turnAxes.x) * TURN_SNAP;
+    dolly.rotation.y = yaw;
+    lastTurnTime = t;
+  }
+
+  const baseSpeed = 5.5;
+  const sprintSpeed = 9.0;
+  // Head-relative movement when in XR, else dolly yaw
+  let forward, right;
+  if (renderer.xr.isPresenting) {
+    const xrCam = renderer.xr.getCamera(camera);
+    const dir = new THREE.Vector3();
+    xrCam.getWorldDirection(dir);
+    dir.y = 0;
+    if (dir.lengthSq() > 0.0001) dir.normalize();
+    else dir.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    forward = dir;
+    right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  } else {
+    forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  }
+  const move = new THREE.Vector3();
+  // Left stick: y forward/back, x strafe
+  move.addScaledVector(forward, -moveAxes.y);
+  move.addScaledVector(right, moveAxes.x);
+
+  const wantsSprint = vrSprint;
+  const canSprint = playerStats.stamina > 0 && move.lengthSq() > 0;
+  const sprinting = wantsSprint && canSprint;
+
+  if (sprinting) {
+    playerStats.stamina = Math.max(0, playerStats.stamina - 28 * dt);
+  } else {
+    playerStats.stamina = Math.min(playerStats.maxStamina, playerStats.stamina + 14 * dt);
+  }
+  if (Math.floor(t * 8) !== Math.floor((t - dt) * 8)) updateHUD();
+
+  const speed = sprinting ? sprintSpeed : baseSpeed;
+
+  if (move.lengthSq() > 0) {
+    move.normalize().multiplyScalar(speed * dt);
+    const from = player.position.clone();
+    let newPos = player.position.clone().add(move);
+    const room = isInsideRoom(newPos.x, newPos.z);
+    if (room) {
+      newPos.x = Math.max(room.minX, Math.min(room.maxX, newPos.x));
+      newPos.z = Math.max(room.minZ, Math.min(room.maxZ, newPos.z));
+    }
+    newPos = resolveColliders(from, newPos, 0.5);
+    if (inTower) {
+      newPos.x = Math.max(-10, Math.min(10, newPos.x));
+      newPos.z = Math.max(-22, Math.min(24, newPos.z));
+    } else {
+      newPos.x = Math.max(-95, Math.min(95, newPos.x));
+      newPos.z = Math.max(-40, Math.min(95, newPos.z));
+    }
+    player.position.copy(newPos);
+    player.position.y = inTower ? -55 : 0;
+  }
+
+  // First-person body sway when walking
+  if (player.userData.fpBody) {
+    const moving = move.lengthSq() > 0;
+    const body = player.userData.fpBody;
+    if (moving) {
+      const phase = t * (sprinting ? 14 : 9);
+      body.position.y = Math.sin(phase) * 0.03;
+      if (player.userData.fpArmL) player.userData.fpArmL.rotation.x = 0.4 + Math.sin(phase) * 0.15;
+      if (player.userData.fpArmR) player.userData.fpArmR.rotation.x = 0.5 + Math.sin(phase + Math.PI) * 0.12;
+      if (player.userData.fpLegL) player.userData.fpLegL.rotation.x = Math.sin(phase) * 0.25;
+      if (player.userData.fpLegR) player.userData.fpLegR.rotation.x = Math.sin(phase + Math.PI) * 0.25;
+    } else {
+      body.position.y *= 0.85;
+      if (player.userData.fpLegL) player.userData.fpLegL.rotation.x *= 0.8;
+      if (player.userData.fpLegR) player.userData.fpLegR.rotation.x *= 0.8;
+    }
+  }
+
+  // In non-XR fallback only; headset owns orientation in VR
+  if (!renderer.xr.isPresenting) {
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw;
+    camera.rotation.x = 0.12;
+  }
+
+  function updateEnemyAI(en, dt) {
+    if (!en.alive) return;
+    const dist = player.position.distanceTo(en.mesh.position);
+    let moving = false;
+    if (dist < en.aggroRange) {
+      const dir = new THREE.Vector3().subVectors(player.position, en.mesh.position);
+      dir.y = 0;
+      if (dir.length() > 1.5) {
+        dir.normalize().multiplyScalar(en.speed * dt);
+        en.mesh.position.add(dir);
+        en.mesh.lookAt(player.position.x, en.mesh.position.y, player.position.z);
+        moving = true;
+      }
+      en.attackCooldown -= dt;
+      if (dist < 2.2 && en.attackCooldown <= 0) {
+        en.attackCooldown = en.name === 'Malakar' ? 1.0 : 1.3;
+        const dmg = Math.max(1, en.attack - playerStats.defense + Math.floor(Math.random()*4));
+        playerStats.hp -= dmg;
+        playSFX('hurt');
+        document.getElementById('damage-flash').style.opacity = 1;
+        setTimeout(() => document.getElementById('damage-flash').style.opacity = 0, 90);
+        updateHUD();
+        if (playerStats.hp <= 0) {
+          playerStats.hp = 0; updateHUD();
+          showDeathScreen();
+        }
+      }
+    }
+    if (moving) {
+      en.mesh.userData.walkPhase = (en.mesh.userData.walkPhase||0) + dt*7;
+      const s = Math.sin(en.mesh.userData.walkPhase);
+      if (en.mesh.userData.leftLeg) {
+        en.mesh.userData.leftLeg.rotation.x = s*0.45;
+        en.mesh.userData.rightLeg.rotation.x = -s*0.45;
+      }
+    } else if (en.mesh.userData.leftLeg) {
+      en.mesh.userData.leftLeg.rotation.x *= 0.8;
+      en.mesh.userData.rightLeg.rotation.x *= 0.8;
+    }
+  }
+
+  enemies.forEach(en => updateEnemyAI(en, dt));
+  if (boss) {
+    updateEnemyAI(boss, dt);
+    // Start boss cutscene when player enters throne room after puzzle
+    if (inTower && towerDoorOpen && boss.alive && boss.aggroRange === 0 && !cutsceneActive && !inDialogue) {
+      const dBoss = player.position.distanceTo(boss.mesh.position);
+      if (dBoss < 10) startBossCutscene();
+    }
+  }
+
+  npcs.forEach(npc => {
+    if (npc.mesh.userData.leftArm) {
+      npc.mesh.userData.walkPhase = (npc.mesh.userData.walkPhase||0) + dt*1.3;
+      const s = Math.sin(npc.mesh.userData.walkPhase)*0.06;
+      npc.mesh.userData.leftArm.rotation.z = 0.15+s;
+      npc.mesh.userData.rightArm.rotation.z = -0.15-s;
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+function init() {
+  detectMobile();
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.xr.enabled = true;
+  // Prefer local-floor for Quest standing / room-scale comfort
+  try { renderer.xr.setReferenceSpaceType('local-floor'); } catch (e) {}
+  document.body.appendChild(renderer.domElement);
+
+  createWorld();
+  createPlayer();
+  createNPCs();
+  createEnemies();
+  setupControls();
+
+  dayTime = 0.32; // morning
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // XR animation loop (required for WebXR)
+  renderer.setAnimationLoop(animate);
+
+  // Auto-enter immersive VR as soon as possible (App Lab / Quest packaging)
+  autoEnterVR();
+  // Also listen for sessiongranted (some Quest / browser flows)
+  if (navigator.xr) {
+    navigator.xr.addEventListener('sessiongranted', () => autoEnterVR());
+  }
+  // Retry a few times if session not ready yet
+  let retries = 0;
+  const retryTimer = setInterval(() => {
+    if (vrSessionActive || retries > 12) { clearInterval(retryTimer); return; }
+    retries++;
+    autoEnterVR();
+  }, 500);
+}
+
+async function autoEnterVR() {
+  if (vrSessionActive) return;
+  if (!navigator.xr) {
+    const st = document.getElementById('vr-status');
+    if (st) st.textContent = 'WebXR not available — open on Meta Quest';
+    // Still start game logic so world runs (for APK WebView edge cases)
+    startGame();
+    return;
+  }
+  try {
+    const supported = await navigator.xr.isSessionSupported('immersive-vr');
+    if (!supported) {
+      const st = document.getElementById('vr-status');
+      if (st) st.textContent = 'Immersive VR not supported on this device';
+      startGame();
+      return;
+    }
+    const session = await navigator.xr.requestSession('immersive-vr', {
+      optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
+    });
+    await renderer.xr.setSession(session);
+    vrSessionActive = true;
+    session.addEventListener('end', () => {
+      vrSessionActive = false;
+      const st = document.getElementById('vr-status');
+      if (st) {
+        document.getElementById('title-screen').style.display = 'flex';
+        document.getElementById('title-screen').style.opacity = '1';
+        st.textContent = 'VR session ended — reopening…';
+      }
+      setTimeout(autoEnterVR, 800);
+    });
+    startGame();
+  } catch (err) {
+    console.warn('Auto VR entry:', err);
+    const st = document.getElementById('vr-status');
+    if (st) st.textContent = 'Requesting VR… (put on headset)';
+    // App Lab packages often grant session after short delay / focus
+  }
+}
+
+function startGame() {
+  ensureAudio();
+  if (window.speechSynthesis) window.speechSynthesis.getVoices();
+
+  const title = document.getElementById('title-screen');
+  if (title) {
+    title.style.opacity = '0';
+    setTimeout(() => { title.style.display = 'none'; }, 600);
+  }
+  document.getElementById('ui').style.display = 'flex';
+  gameStarted = true;
+  updateHUD();
+  updateQuestUI();
+  updateWeaponVisual();
+
+  document.getElementById('controls-hint').textContent =
+    'Left Stick Move · Right Stick Snap-Turn · Trigger Attack · Squeeze / A Interact · Y / B Inventory · Grip Sprint';
+}
+
+init();
+</script>
+</body>
+</html>
