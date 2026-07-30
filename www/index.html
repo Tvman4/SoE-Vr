@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Shadows of Eldoria — 3D RPG</title>
+<title>Shadows of Eldoria — VR RPG</title>
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e0d0; touch-action: none; }
@@ -134,7 +135,7 @@
     You are <strong>Kael</strong> of Brightwood. Enter the Elder's house,<br>
     accept the quest, and restore the dawn.
   </div>
-  <div id="vr-status">Entering VR…</div>
+  <div id="vr-status">Pull trigger or tap to enter VR</div>
 </div>
 
 <div id="ui" style="display:none;">
@@ -1098,99 +1099,109 @@ function createPlayer() {
   camera.position.set(0, 1.65, 0);
   dolly.add(camera);
 
-  // First-person body (visible when looking down)
-  const body = new THREE.Group();
-  body.name = 'fpBody';
   const skinMat = new THREE.MeshStandardMaterial({ color: 0xc4a88a, roughness: 0.7 });
   const clothMat = new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.8 });
   const pantsMat = new THREE.MeshStandardMaterial({ color: 0x2a2a38, roughness: 0.85 });
 
-  // Chest / torso visible below
+  // Minimal torso under head (still visible if you look down) — arms go on controllers
+  const body = new THREE.Group();
+  body.name = 'fpBody';
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.5, 0.28), clothMat);
   torso.position.set(0, -0.55, 0.05);
   body.add(torso);
-
-  // Legs
   const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.7, 8), pantsMat);
   legL.position.set(-0.12, -1.15, 0.05);
   body.add(legL);
   const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.7, 8), pantsMat);
   legR.position.set(0.12, -1.15, 0.05);
   body.add(legR);
-
-  // Left arm (always a bit visible)
-  const armL = new THREE.Group();
-  const uaL = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.35, 8), clothMat);
-  uaL.position.set(0, -0.15, 0);
-  armL.add(uaL);
-  const faL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.3, 8), skinMat);
-  faL.position.set(0, -0.42, 0);
-  armL.add(faL);
-  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skinMat);
-  handL.position.set(0, -0.58, 0);
-  armL.add(handL);
-  armL.position.set(-0.35, -0.25, -0.25);
-  armL.rotation.set(0.4, 0.2, 0.5);
-  body.add(armL);
-
-  // Right arm holds weapon — positioned near viewmodel
-  const armR = new THREE.Group();
-  const uaR = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.35, 8), clothMat);
-  uaR.position.set(0, -0.15, 0);
-  armR.add(uaR);
-  const faR = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.3, 8), skinMat);
-  faR.position.set(0, -0.42, 0);
-  armR.add(faR);
-  const handR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skinMat);
-  handR.position.set(0, -0.58, 0);
-  armR.add(handR);
-  armR.position.set(0.32, -0.3, -0.35);
-  armR.rotation.set(0.5, -0.15, -0.55);
-  body.add(armR);
-
   camera.add(body);
   player.userData.fpBody = body;
-  player.userData.fpArmR = armR;
-  player.userData.fpArmL = armL;
   player.userData.fpLegL = legL;
   player.userData.fpLegR = legR;
 
-  // Viewmodel weapons (in right hand area)
+  // ---- Left hand (tracks left controller grip) ----
+  const armL = new THREE.Group();
+  armL.name = 'vrHandL';
+  const uaL = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.28, 8), clothMat);
+  uaL.position.set(0, 0, 0.12);
+  uaL.rotation.x = Math.PI / 2;
+  armL.add(uaL);
+  const faL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.22, 8), skinMat);
+  faL.position.set(0, 0, 0.32);
+  faL.rotation.x = Math.PI / 2;
+  armL.add(faL);
+  const handL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), skinMat);
+  handL.position.set(0, 0, 0.46);
+  armL.add(handL);
+  // Palm / fingers hint
+  const palmL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.025, 0.1), skinMat);
+  palmL.position.set(0, -0.01, 0.52);
+  armL.add(palmL);
+  player.userData.fpArmL = armL;
+  player.userData.vrHandL = armL;
+
+  // ---- Right hand (tracks right controller grip) + weapons ----
+  const armR = new THREE.Group();
+  armR.name = 'vrHandR';
+  const uaR = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.28, 8), clothMat);
+  uaR.position.set(0, 0, 0.12);
+  uaR.rotation.x = Math.PI / 2;
+  armR.add(uaR);
+  const faR = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.22, 8), skinMat);
+  faR.position.set(0, 0, 0.32);
+  faR.rotation.x = Math.PI / 2;
+  armR.add(faR);
+  const handR = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), skinMat);
+  handR.position.set(0, 0, 0.46);
+  armR.add(handR);
+  const palmR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.025, 0.1), skinMat);
+  palmR.position.set(0, -0.01, 0.52);
+  armR.add(palmR);
+  player.userData.fpArmR = armR;
+  player.userData.vrHandR = armR;
+
+  // Weapons oriented along controller forward (−Z in XR controller space → we align along local +Z of hand then flip)
+  // Parent all weapons under right hand group
   const swordG = new THREE.Group();
   const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.65, 0.02), new THREE.MeshStandardMaterial({ color: 0xc0c0c8, metalness: 0.85, roughness: 0.2 }));
-  blade.position.y = 0.35; swordG.add(blade);
+  blade.position.y = 0.38; swordG.add(blade);
   const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.035), new THREE.MeshStandardMaterial({ color: 0x4a3020 }));
   swordG.add(hilt);
   const guard = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.035, 0.045), new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6 }));
   guard.position.y = 0.08; swordG.add(guard);
-  swordG.position.set(0.28, -0.55, -0.55);
-  swordG.rotation.set(0.35, 0.1, -0.5);
-  camera.add(swordG);
+  // Grip pose: sword points forward from hand
+  swordG.position.set(0.02, -0.02, 0.42);
+  swordG.rotation.set(-Math.PI / 2, 0, 0.15);
+  armR.add(swordG);
   weaponMeshes.sword = swordG;
 
   const axeG = new THREE.Group();
   const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), new THREE.MeshStandardMaterial({ color: 0x5a3a20 }));
-  handle.position.y = 0.28; axeG.add(handle);
+  handle.position.y = 0.3; axeG.add(handle);
   const axeHead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.07), new THREE.MeshStandardMaterial({ color: 0x777780, metalness: 0.7 }));
-  axeHead.position.set(0.1, 0.6, 0); axeG.add(axeHead);
-  axeG.position.set(0.3, -0.55, -0.5);
-  axeG.rotation.set(0.4, 0.1, -0.55);
+  axeHead.position.set(0.1, 0.62, 0); axeG.add(axeHead);
+  axeG.position.set(0.02, -0.02, 0.42);
+  axeG.rotation.set(-Math.PI / 2, 0, 0.1);
   axeG.visible = false;
-  camera.add(axeG);
+  armR.add(axeG);
   weaponMeshes.axe = axeG;
 
   const staffG = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.85, 6), new THREE.MeshStandardMaterial({ color: 0x3a2a4a }));
-  pole.position.y = 0.32; staffG.add(pole);
+  pole.position.y = 0.35; staffG.add(pole);
   const orb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshStandardMaterial({ color: 0x66aaff, emissive: 0x2244aa, emissiveIntensity: 0.8 }));
-  orb.position.y = 0.8; staffG.add(orb);
-  staffG.position.set(0.28, -0.45, -0.55);
-  staffG.rotation.set(0.25, 0, -0.4);
+  orb.position.y = 0.82; staffG.add(orb);
+  staffG.position.set(0.02, -0.02, 0.4);
+  staffG.rotation.set(-Math.PI / 2, 0, 0);
   staffG.visible = false;
-  camera.add(staffG);
+  armR.add(staffG);
   weaponMeshes.staff = staffG;
 
   weaponMeshes.fists = null;
+  // Hands start hidden until controllers connect; setupControls parents them
+  armL.visible = false;
+  armR.visible = false;
   updateWeaponVisual();
 }
 
@@ -1220,7 +1231,7 @@ function setupControls() {
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(0, 0, -1)
   ]);
-  const lineMat = new THREE.LineBasicMaterial({ color: 0xd4a84b, transparent: true, opacity: 0.6 });
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xd4a84b, transparent: true, opacity: 0.55 });
 
   controller0 = renderer.xr.getController(0);
   controller0.add(new THREE.Line(geo, lineMat));
@@ -1236,13 +1247,41 @@ function setupControls() {
   controller1.addEventListener('squeezeend', onSqueezeEnd);
   dolly.add(controller1);
 
-  // Simple grip placeholders (no external XRControllerModelFactory dependency)
+  // Grip spaces track the physical controller pose — attach hands here
   controllerGrip0 = renderer.xr.getControllerGrip(0);
-  dolly.add(controllerGrip0);
   controllerGrip1 = renderer.xr.getControllerGrip(1);
+  dolly.add(controllerGrip0);
   dolly.add(controllerGrip1);
 
-  // Poll gamepads every frame in animate via updateVRInput()
+  const handL = player.userData.vrHandL;
+  const handR = player.userData.vrHandR;
+
+  function attachHand(grip, hand, isRight) {
+    if (!hand || !grip) return;
+    // Detach from any previous parent
+    if (hand.parent) hand.parent.remove(hand);
+    grip.add(hand);
+    // Offset so the palm sits near the controller body
+    hand.position.set(0, 0, 0);
+    hand.rotation.set(0, 0, 0);
+    hand.visible = true;
+  }
+
+  // Attach when controllers connect (Quest reports connected after session starts)
+  controllerGrip0.addEventListener('connected', () => attachHand(controllerGrip0, handL, false));
+  controllerGrip1.addEventListener('connected', () => attachHand(controllerGrip1, handR, true));
+  controller0.addEventListener('connected', () => attachHand(controllerGrip0, handL, false));
+  controller1.addEventListener('connected', () => attachHand(controllerGrip1, handR, true));
+
+  // Immediate attach (works once session is live; safe if grips already present)
+  attachHand(controllerGrip0, handL, false);
+  attachHand(controllerGrip1, handR, true);
+
+  // Also re-attach after VR session starts (grips become active then)
+  renderer.xr.addEventListener('sessionstart', () => {
+    attachHand(controllerGrip0, handL, false);
+    attachHand(controllerGrip1, handR, true);
+  });
 }
 
 function onSelectStart(event) {
@@ -1393,8 +1432,17 @@ function tryAttack() {
   playSFX('swing');
   const mesh = weaponMeshes[w.id];
   if (mesh) {
-    mesh.rotation.x = -1.1;
-    setTimeout(() => { if (mesh) mesh.rotation.x = 0.15; }, 180);
+    // Quick slash arc on the held weapon (weapons oriented along hand forward)
+    const baseZ = mesh.rotation.z;
+    mesh.rotation.z = baseZ - 0.9;
+    setTimeout(() => { if (mesh) mesh.rotation.z = baseZ; }, 160);
+  }
+  // Also nudge right hand for feedback
+  const handR = player.userData.vrHandR;
+  if (handR) {
+    const base = handR.rotation.x;
+    handR.rotation.x = base - 0.5;
+    setTimeout(() => { if (handR) handR.rotation.x = base; }, 160);
   }
   function hitEnemy(en, w) {
     if (!en || !en.alive) return;
@@ -2119,15 +2167,13 @@ function animate() {
     player.position.y = inTower ? -55 : 0;
   }
 
-  // First-person body sway when walking
+  // Body sway (legs only — arms track controllers)
   if (player.userData.fpBody) {
     const moving = move.lengthSq() > 0;
     const body = player.userData.fpBody;
     if (moving) {
       const phase = t * (sprinting ? 14 : 9);
       body.position.y = Math.sin(phase) * 0.03;
-      if (player.userData.fpArmL) player.userData.fpArmL.rotation.x = 0.4 + Math.sin(phase) * 0.15;
-      if (player.userData.fpArmR) player.userData.fpArmR.rotation.x = 0.5 + Math.sin(phase + Math.PI) * 0.12;
       if (player.userData.fpLegL) player.userData.fpLegL.rotation.x = Math.sin(phase) * 0.25;
       if (player.userData.fpLegR) player.userData.fpLegR.rotation.x = Math.sin(phase + Math.PI) * 0.25;
     } else {
@@ -2236,70 +2282,65 @@ function init() {
   // XR animation loop (required for WebXR)
   renderer.setAnimationLoop(animate);
 
-  // Auto-enter immersive VR as soon as possible (App Lab / Quest packaging)
+  // Never block the game on VR session — start immediately
+  startGame();
+
+  // Try auto VR; also on gesture (required by many WebViews)
   autoEnterVR();
-  // Also listen for sessiongranted (some Quest / browser flows)
   if (navigator.xr) {
     navigator.xr.addEventListener('sessiongranted', () => autoEnterVR());
   }
-  // Retry a few times if session not ready yet
-  let retries = 0;
-  const retryTimer = setInterval(() => {
-    if (vrSessionActive || retries > 12) { clearInterval(retryTimer); return; }
-    retries++;
-    autoEnterVR();
-  }, 500);
+  const gestureEnter = () => { autoEnterVR(); };
+  document.body.addEventListener('click', gestureEnter);
+  document.body.addEventListener('touchend', gestureEnter);
+  // Controllers may not exist yet; selectstart is wired in setupControls too via onSelectStart
 }
 
 async function autoEnterVR() {
   if (vrSessionActive) return;
   if (!navigator.xr) {
-    const st = document.getElementById('vr-status');
-    if (st) st.textContent = 'WebXR not available — open on Meta Quest';
-    // Still start game logic so world runs (for APK WebView edge cases)
-    startGame();
+    setVrStatus('WebXR not available');
     return;
   }
   try {
     const supported = await navigator.xr.isSessionSupported('immersive-vr');
     if (!supported) {
-      const st = document.getElementById('vr-status');
-      if (st) st.textContent = 'Immersive VR not supported on this device';
-      startGame();
+      setVrStatus('Immersive VR not supported — tap or pull trigger');
       return;
     }
+    setVrStatus('Pull trigger or tap to enter VR');
     const session = await navigator.xr.requestSession('immersive-vr', {
       optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
     });
     await renderer.xr.setSession(session);
     vrSessionActive = true;
+    setVrStatus('');
+    const title = document.getElementById('title-screen');
+    if (title) { title.style.display = 'none'; }
     session.addEventListener('end', () => {
       vrSessionActive = false;
-      const st = document.getElementById('vr-status');
-      if (st) {
-        document.getElementById('title-screen').style.display = 'flex';
-        document.getElementById('title-screen').style.opacity = '1';
-        st.textContent = 'VR session ended — reopening…';
-      }
-      setTimeout(autoEnterVR, 800);
+      setVrStatus('VR ended — pull trigger to re-enter');
     });
-    startGame();
   } catch (err) {
     console.warn('Auto VR entry:', err);
-    const st = document.getElementById('vr-status');
-    if (st) st.textContent = 'Requesting VR… (put on headset)';
-    // App Lab packages often grant session after short delay / focus
+    setVrStatus('Pull trigger or tap to enter VR');
   }
 }
 
+function setVrStatus(msg) {
+  const st = document.getElementById('vr-status');
+  if (st) st.textContent = msg || '';
+}
+
 function startGame() {
+  if (gameStarted) return;
   ensureAudio();
   if (window.speechSynthesis) window.speechSynthesis.getVoices();
 
   const title = document.getElementById('title-screen');
   if (title) {
-    title.style.opacity = '0';
-    setTimeout(() => { title.style.display = 'none'; }, 600);
+    title.style.opacity = '0.85';
+    // Keep thin status visible until VR connects; world already runs
   }
   document.getElementById('ui').style.display = 'flex';
   gameStarted = true;
